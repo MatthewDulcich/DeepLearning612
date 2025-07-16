@@ -21,6 +21,8 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import imageio
+import io
 
 # Import local modules
 try:
@@ -621,7 +623,11 @@ def main():
         # Display video if frames available
         if results["frames"]:
             st.subheader("Flight Video")
-            st.video(results["frames"])
+            # Convert frames to MP4 in memory
+            video_bytes = io.BytesIO()
+            imageio.mimsave(video_bytes, results["frames"], format="mp4", fps=20)
+            video_bytes.seek(0)
+            st.video(video_bytes, format="video/mp4", caption="Flight Animation (MP4)")
         
         # Display attention visualization if available
         if results["attention"] is not None and len(results["attention"]) > 0:
@@ -667,6 +673,3 @@ def main():
         - Path Deviation < 0.5m (accuracy)
         - Inference Latency < 10ms (real-time capability)
         """)
-
-if __name__ == "__main__":
-    main()
