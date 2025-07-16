@@ -1,0 +1,34 @@
+# Large Transformer teacher configuration
+env_id: FlyCraft-Nav-v0
+run_name: teacher_large
+output_dir: runs
+seed: 42
+n_envs: 16
+max_episode_steps: 1000
+
+policy: transformer
+policy_kwargs:
+  transformer_kwargs:
+    embed_dim: 512
+    depth: 8
+    num_heads: 16
+    dropout: 0.1
+    memory_size: 128
+
+ppo_kwargs:
+  learning_rate: 3.0e-4
+  n_steps: 2048
+  batch_size: 4096
+  n_epochs: 4
+  gamma: 0.995
+  gae_lambda: 0.95
+  clip_range: 0.2
+
+timesteps: 5000000
+save_freq: 50000
+eval_freq: 20000
+n_eval_episodes: 10
+
+use_spatio_temporal: true
+predict_sequence: true
+prediction_horizon: 200

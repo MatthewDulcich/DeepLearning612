@@ -1,0 +1,31 @@
+env_id: FlyCraft-Nav-v0
+run_name: perceiver_act
+output_dir: runs
+seed: 17
+n_envs: 8
+
+policy: perceiver
+policy_kwargs:
+  perceiver_kwargs:
+    latent_dim: 256
+    num_latents: 64
+    num_self_layers: 4
+  use_act: true
+  act_max_steps: 6
+  act_threshold: 0.05
+
+ppo_kwargs:
+  learning_rate: 2.0e-4
+  n_steps: 1024
+  batch_size: 2048
+  n_epochs: 4
+  gamma: 0.995
+  gae_lambda: 0.95
+  clip_range: 0.2
+
+timesteps: 1500000
+save_freq: 20000
+eval_freq: 10000
+
+use_spatio_temporal: false
+predict_sequence: false
