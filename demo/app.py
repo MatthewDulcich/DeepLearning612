@@ -673,3 +673,6 @@ def main():
         - Path Deviation < 0.5m (accuracy)
         - Inference Latency < 10ms (real-time capability)
         """)
+
+if __name__ == "__main__":
+    main()
