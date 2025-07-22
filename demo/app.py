@@ -94,7 +94,7 @@ def load_model(model_path: str, model_type: str = "transformer"):
     """
     try:
         # Create environment
-        env = gym.make("FlyCraft-Nav-v0", render_mode="rgb_array", max_episode_steps=1000)
+        env = gym.make("FlyCraft-v0", render_mode="rgb_array", max_episode_steps=1000)
         
         # For PID controller, return a custom controller
         if model_type == "pid":
