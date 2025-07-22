@@ -333,7 +333,7 @@ def main() -> None:  # noqa: D401
     rng = np.random.default_rng(args.seed)
 
     # Create environment
-    env = gym.make("FlyCraft-v0", render_mode=None, max_episode_steps=args.max_steps)
+    env = gym.make("FlyCraft-v0", max_episode_steps=args.max_steps)
 
     # Generate terrain IDs to use
     available_terrains = list(range(10))  # Assuming 10 terrains available

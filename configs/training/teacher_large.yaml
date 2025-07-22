@@ -1,5 +1,5 @@
 # Large Transformer teacher configuration
-env_id: FlyCraft-Nav-v0
+env_id: FlyCraft-v0
 run_name: teacher_large
 output_dir: runs
 seed: 42

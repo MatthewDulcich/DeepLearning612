@@ -139,7 +139,10 @@ def make_env(env_id: str, seed: int, rank: int = 0, capture_video: bool = False,
             
         # Create environment with appropriate render mode
         render_mode = "rgb_array" if capture_video else None
-        env = gym.make(env_id, render_mode=render_mode, max_episode_steps=1000)
+
+        # env = gym.make(env_id, max_episode_steps=1000) # Use plain FlyCraft environment for now, more work needed for custom gym models
+
+        env = gym.make("FlyCraft-v0", max_episode_steps=1000)
         
         # Set environment seed
         env.reset(seed=seed + rank)
@@ -457,7 +460,7 @@ def main() -> None:  # noqa: D401
     set_random_seed(seed)
     
     # Environment configuration
-    env_id = cfg.get("env_id", "FlyCraft-Nav-v0")
+    env_id = cfg.get("env_id", "FlyCraft-v0")
     n_envs = cfg.get("n_envs", 8)
     
     # Output directory
