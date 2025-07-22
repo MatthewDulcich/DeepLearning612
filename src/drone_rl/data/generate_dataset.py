@@ -28,7 +28,7 @@ import tqdm
 
 try:
     import gymnasium as gym
-    import flycraft_gym  # noqa: F401  # pylint: disable=unused-import
+    import flycraft  # noqa: F401  # pylint: disable=unused-import
 except ImportError as exc:  # pragma: no cover
     raise ImportError(
         "FlyCraft gym is required. Install via `pip install flycraft` or ensure that"
@@ -45,7 +45,7 @@ except ImportError:
 
 # ------------------------- utilities ------------------------- #
 
-def randomise_env(env: gym.Env, seed: int, terrain_ids: List[int], weather_configs: List[Dict]) -> Dict:  # noqa: D401
+def randomise_env(env: gym.Env, seed: int, terrain_ids: List[int]) -> Dict:  # noqa: D401
     """Apply domain randomisation to the FlyCraft environment.
     
     Parameters
@@ -68,22 +68,22 @@ def randomise_env(env: gym.Env, seed: int, terrain_ids: List[int], weather_confi
     
     # Select a terrain from available options
     terrain_id = terrain_ids[rng.integers(0, len(terrain_ids))]
-    env.set_terrain(terrain_id=terrain_id)
+    # env.set_terrain(terrain_id=terrain_id)
     
-    # Either use a preset or generate random weather
-    if weather_configs and rng.random() < 0.7:  # 70% chance to use preset
-        weather = weather_configs[rng.integers(0, len(weather_configs))]
-        env.set_weather(**weather)
-    else:
-        # Generate random weather parameters
-        weather = {
-            "wind_speed": rng.uniform(0.0, 8.0),  # m/s
-            "wind_dir": rng.uniform(0.0, 360.0),  # degrees
-            "fog_density": rng.uniform(0.0, 0.5),  # 0-1 scale
-            "rain_intensity": rng.uniform(0.0, 0.3),  # 0-1 scale
-            "turbulence": rng.uniform(0.0, 0.4),  # 0-1 scale
-        }
-        env.set_weather(**weather)
+    # # Either use a preset or generate random weather
+    # if weather_configs and rng.random() < 0.7:  # 70% chance to use preset
+    #     weather = weather_configs[rng.integers(0, len(weather_configs))]
+    #     env.set_weather(**weather)
+    # else:
+    #     # Generate random weather parameters
+    #     weather = {
+    #         "wind_speed": rng.uniform(0.0, 8.0),  # m/s
+    #         "wind_dir": rng.uniform(0.0, 360.0),  # degrees
+    #         "fog_density": rng.uniform(0.0, 0.5),  # 0-1 scale
+    #         "rain_intensity": rng.uniform(0.0, 0.3),  # 0-1 scale
+    #         "turbulence": rng.uniform(0.0, 0.4),  # 0-1 scale
+    #     }
+    #     env.set_weather(**weather)
     
     # Randomize sensor characteristics
     sensor_config = {
@@ -91,7 +91,7 @@ def randomise_env(env: gym.Env, seed: int, terrain_ids: List[int], weather_confi
         "bias": rng.uniform(-0.05, 0.05),  # Systematic bias
         "dropout_prob": rng.uniform(0.0, 0.02),  # Probability of sensor dropout
     }
-    env.set_sensor_noise(**sensor_config)
+    # env.set_sensor_noise(**sensor_config)
     
     # Randomize obstacle layout if supported
     if hasattr(env, "set_obstacle_layout"):
@@ -103,7 +103,7 @@ def randomise_env(env: gym.Env, seed: int, terrain_ids: List[int], weather_confi
     # Return the full configuration for metadata
     return {
         "terrain_id": terrain_id,
-        "weather": weather,
+        # "weather": weather,
         "sensor_config": sensor_config,
         "obstacle_config": {
             "density": obstacle_density if hasattr(env, "set_obstacle_layout") else 0.0,
@@ -333,7 +333,7 @@ def main() -> None:  # noqa: D401
     rng = np.random.default_rng(args.seed)
 
     # Create environment
-    env = gym.make("FlyCraft-Nav-v0", render_mode=None, max_episode_steps=args.max_steps)
+    env = gym.make("FlyCraft-v0", max_episode_steps=args.max_steps)
 
     # Generate terrain IDs to use
     available_terrains = list(range(10))  # Assuming 10 terrains available
@@ -343,15 +343,15 @@ def main() -> None:  # noqa: D401
         terrain_ids = available_terrains
 
     # Generate weather presets
-    weather_configs = []
-    for _ in range(args.weather):
-        weather_configs.append({
-            "wind_speed": rng.uniform(0.0, 8.0),
-            "wind_dir": rng.uniform(0.0, 360.0),
-            "fog_density": rng.uniform(0.0, 0.5),
-            "rain_intensity": rng.uniform(0.0, 0.3),
-            "turbulence": rng.uniform(0.0, 0.4),
-        })
+    # weather_configs = []
+    # for _ in range(args.weather):
+    #     weather_configs.append({
+    #         "wind_speed": rng.uniform(0.0, 8.0),
+    #         "wind_dir": rng.uniform(0.0, 360.0),
+    #         "fog_density": rng.uniform(0.0, 0.5),
+    #         "rain_intensity": rng.uniform(0.0, 0.3),
+    #         "turbulence": rng.uniform(0.0, 0.4),
+    #     })
 
     # Initialize metadata collection
     metadata = []
@@ -371,8 +371,8 @@ def main() -> None:  # noqa: D401
         env_config = randomise_env(
             env, 
             seed=args.seed + ep,
-            terrain_ids=terrain_ids,
-            weather_configs=weather_configs
+            terrain_ids=terrain_ids
+            # weather_configs=weather_configs
         )
         
         # Collect episode data
@@ -389,7 +389,7 @@ def main() -> None:  # noqa: D401
             "episode": ep,
             "steps": len(trans["reward"]),
             "terrain": env_config["terrain_id"],
-            "weather": env_config["weather"],
+            # "weather": env_config["weather"],
             "return": float(sum(trans["reward"])),
         }
         metadata.append(episode_meta)
@@ -471,7 +471,7 @@ def main() -> None:  # noqa: D401
         "total_episodes": args.episodes,
         "total_transitions": total_transitions,
         "terrains_used": terrain_ids,
-        "weather_configs": weather_configs,
+        # "weather_configs": weather_configs,
         "avg_episode_length": total_transitions / args.episodes,
         "shards": shard_idx + 1,
         "real_data_included": args.real_data is not None and os.path.exists(args.real_data),
