@@ -133,7 +133,7 @@ def make_env(env_id: str, seed: int, rank: int = 0, capture_video: bool = False,
         # Import here to avoid importing gym when not needed
         import gymnasium as gym
         try:
-            import flycraft_gym  # noqa: F401
+            import flycraft  # noqa: F401
         except ImportError:
             pass  # Allow other environments
             

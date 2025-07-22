@@ -28,7 +28,7 @@ import tqdm
 
 try:
     import gymnasium as gym
-    import flycraft_gym  # noqa: F401  # pylint: disable=unused-import
+    import flycraft  # noqa: F401  # pylint: disable=unused-import
 except ImportError as exc:  # pragma: no cover
     raise ImportError(
         "FlyCraft gym is required. Install via `pip install flycraft` or ensure that"

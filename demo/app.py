@@ -26,7 +26,7 @@ import io
 
 # Import local modules
 try:
-    import flycraft_gym  # noqa: F401
+    import flycraft  # noqa: F401
 except ImportError:
     st.error("FlyCraft gym not installed. Install with: pip install flycraft")
     st.stop()

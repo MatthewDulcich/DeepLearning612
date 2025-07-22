@@ -9,7 +9,7 @@
 #SBATCH --error=%x_%j.err
 
 # Load modules
-module load cuda/12.1 gcc/11.3
+module load cuda gcc
 
 # Activate Conda environment located in scratch
 source "$SCRATCH/conda/envs/drone-rl/bin/activate"
