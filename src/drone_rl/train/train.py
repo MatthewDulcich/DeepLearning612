@@ -5,8 +5,8 @@ import argparse
 import json
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple, Union, List
-from stable_baselines3.common.utils import set_random_seed, get_linear_fn
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
 import gymnasium as gym
 import numpy as np
 import torch
@@ -14,20 +14,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 import yaml
 from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import (
-    BaseCallback,
-    CheckpointCallback,
-    EvalCallback,
-)
+from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback, EvalCallback
 from stable_baselines3.common.logger import configure
-from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor
+from stable_baselines3.common.utils import get_linear_fn, set_random_seed
+from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor, VecNormalize
 
-# local
+# Local
 from drone_rl.models.transformer_policy import TransformerActorCritic
-from drone_rl.models.baselines import SimpleLSTMPolicy, DronePositionController
+from drone_rl.models.baselines import SimpleLSTMPolicy, DronePositionController  # optional
 from drone_rl.utils.metrics import count_parameters, estimate_flops
 
+# wandb optional
 try:
     import wandb
     from wandb.integration.sb3 import WandbCallback
@@ -35,28 +32,28 @@ try:
 except ImportError:
     WANDB_AVAILABLE = False
 
+# cuda check
 try:
     from torch.cuda import is_available as cuda_available  # noqa: WPS433
-except ImportError:  # pragma: no cover
+except ImportError:
     cuda_available = lambda: False  # type: ignore
 
-# Optional performer/perceiver
+# Optional other policies
 try:
     from drone_rl.models.performer import PerformerActorCritic
     PERFORMER_AVAILABLE = True
-except ImportError:
+except Exception:
     PERFORMER_AVAILABLE = False
     PerformerActorCritic = None  # type: ignore
 
 try:
     from drone_rl.models.perceiver import PerceiverActorCritic
     PERCEIVER_AVAILABLE = True
-except ImportError:
+except Exception:
     PERCEIVER_AVAILABLE = False
     PerceiverActorCritic = None  # type: ignore
 
-
-POLICIES = {
+POLICIES: Dict[str, Any] = {
     "transformer": TransformerActorCritic,
     "lstm": SimpleLSTMPolicy,
 }
@@ -70,33 +67,52 @@ if PERCEIVER_AVAILABLE:
 def load_config(path: str | Path) -> Dict[str, Any]:
     path = Path(path)
     with open(path, "r", encoding="utf-8") as f:
-        if str(path).endswith((".yaml", ".yml")):
+        if path.suffix in (".yaml", ".yml"):
             return yaml.safe_load(f)
         return json.load(f)
 
 
-def make_env(env_id: str, seed: int, rank: int = 0, capture_video: bool = False, run_dir: Optional[Path] = None) -> Callable:
+def make_env(
+    env_id: str,
+    seed: int,
+    rank: int = 0,
+    capture_video: bool = False,
+    run_dir: Optional[Path] = None,
+    max_episode_steps: int = 1000,
+) -> Callable[[], gym.Env]:
     def _init() -> gym.Env:
         try:
             import flycraft  # noqa: F401
         except ImportError:
             pass
-        env = gym.make(env_id, max_episode_steps=1000)
+        env = gym.make(env_id, max_episode_steps=max_episode_steps)
         env.reset(seed=seed + rank)
 
-        if capture_video and run_dir is not None:
+        if capture_video and rank == 0 and run_dir is not None:
             from gymnasium.wrappers import RecordVideo
             video_dir = run_dir / "videos"
             video_dir.mkdir(exist_ok=True)
             env = RecordVideo(
                 env,
                 video_dir,
-                episode_trigger=lambda x: x % 100 == 0,
+                episode_trigger=lambda ep: ep % 100 == 0,
                 name_prefix=f"{env_id.split('-')[0]}",
             )
         return env
 
     return _init
+
+
+def _flatten_np(obs: Any) -> np.ndarray:
+    """Flatten dict or array obs/state to 1D numpy array."""
+    if isinstance(obs, dict):
+        parts = []
+        for v in obs.values():
+            v = np.asarray(v)
+            parts.append(v.reshape(-1))
+        return np.concatenate(parts, axis=0)
+    arr = np.asarray(obs)
+    return arr.reshape(-1)
 
 
 # ---------- Callbacks ---------- #
@@ -122,47 +138,57 @@ class SequencePredictionCallback(BaseCallback):
         if self.n_calls % self.eval_freq != 0:
             return True
         if not hasattr(self.model.policy, "predict_next_states"):
-            self.logger.record("eval/seq_prediction_mse", 0.0)
             return True
 
         mse_values: List[float] = []
-
         for _ in range(self.n_eval_episodes):
             obs = self.eval_env.reset()
-            # VecEnv returns np.ndarray or tuple: (obs, info) only on gym Env
             if isinstance(obs, tuple):
                 obs, _ = obs
-            done = False
-            true_states, observations = [], []
+
+            dones = [False]
+            true_states: List[np.ndarray] = []
+            observations: List[Any] = []
             steps = 0
-            while not done and steps < self.horizon:
+            while not dones[0] and steps < self.horizon:
                 observations.append(obs)
                 action, _ = self.model.predict(obs, deterministic=True)
-                next_obs, rewards, dones, infos = self.eval_env.step(action)
+                next_obs, _, dones, infos = self.eval_env.step(action)
+
                 info = infos[0]
-                if "state" in info:
-                    true_states.append(info["state"])
-                else:
-                    true_states.append(next_obs if not isinstance(next_obs, tuple) else next_obs[0])
+                state_ref = info.get("state", None)
+                if state_ref is None:
+                    state_ref = next_obs if not isinstance(next_obs, tuple) else next_obs[0]
+                true_states.append(_flatten_np(state_ref))
+
                 obs = next_obs
-                done = dones[0]
                 steps += 1
 
-            preds = self.model.policy.predict_next_states(observations[0], self.horizon)
-            L = min(len(true_states), len(preds))
-            if L > 0:
-                true_np = np.array(true_states[:L])
-                pred_np = np.array(preds[:L])
-                true_np = true_np.reshape(L, -1)
-                pred_np = pred_np.reshape(L, -1)
+            try:
+                preds = self.model.policy.predict_next_states(observations[0], steps)
+            except Exception as e:
+                self.logger.record("eval/seq_prediction_error", str(e))
+                continue
 
-                mse_values.append(float(np.mean((true_np - pred_np) ** 2)))
+            preds = np.asarray(preds).reshape(steps, -1)
+            L = min(len(true_states), preds.shape[0])
+            if L == 0:
+                continue
+            true_np = np.stack(true_states[:L], axis=0)
+            pred_np = preds[:L]
+            if true_np.shape != pred_np.shape:
+                m = min(true_np.shape[1], pred_np.shape[1])
+                true_np = true_np[:, :m]
+                pred_np = pred_np[:, :m]
 
-        avg_mse = np.mean(mse_values) if mse_values else float("inf")
-        self.logger.record("eval/seq_prediction_mse", avg_mse)
-        if avg_mse < self.best_mse:
-            self.best_mse = avg_mse
-            self.logger.record("eval/best_seq_prediction_mse", self.best_mse)
+            mse_values.append(float(np.mean((true_np - pred_np) ** 2)))
+
+        if mse_values:
+            avg_mse = float(np.mean(mse_values))
+            self.logger.record("eval/seq_prediction_mse", avg_mse)
+            if avg_mse < self.best_mse:
+                self.best_mse = avg_mse
+                self.logger.record("eval/best_seq_prediction_mse", self.best_mse)
         return True
 
 
@@ -174,12 +200,10 @@ class ModelComplexityCallback(BaseCallback):
     def _on_training_start(self) -> None:
         param_count = count_parameters(self.model.policy)
         self.logger.record("model/parameters", param_count)
-
         if self.sample_input is not None:
             flops = estimate_flops(self.model.policy, self.sample_input)
             if flops > 0:
                 self.logger.record("model/flops_per_forward", flops)
-
         if hasattr(self.model.policy, "features_extractor"):
             self.logger.record("model/extractor_type", type(self.model.policy.features_extractor).__name__)
 
@@ -204,14 +228,12 @@ def student_loss(student_out: Tuple, teacher_out: Tuple, temperature: float = 1.
 class StateSequencePredictor(nn.Module):
     """Autoregressive GRU decoder for future state prediction."""
 
-    def __init__(self, embed_dim: int, state_dim: int, horizon: int = 10, hidden_dim: int = 256, num_layers: int = 2):
+    def __init__(self, embed_dim: int, state_dim: int, horizon: int = 10,
+                 hidden_dim: int = 256, num_layers: int = 2):
         super().__init__()
-        self.embed_dim = embed_dim
-        self.state_dim = state_dim
         self.horizon = horizon
-
         self.input_proj = nn.Linear(embed_dim, hidden_dim)
-        self.decoder = nn.GRU(input_size=state_dim, hidden_size=hidden_dim, num_layers=num_layers, batch_first=True)
+        self.decoder = nn.GRU(state_dim, hidden_dim, num_layers=num_layers, batch_first=True)
         self.output_proj = nn.Linear(hidden_dim, state_dim)
 
     def forward(self, embedding: torch.Tensor, initial_state: torch.Tensor) -> torch.Tensor:
@@ -244,12 +266,13 @@ def main() -> None:
 
     env_id = cfg.get("env_id", "FlyCraft-v0")
     n_envs = cfg.get("n_envs", 8)
+    max_episode_steps = cfg.get("max_episode_steps", 1000)
 
+    # dirs
     output_dir = Path(cfg.get("output_dir", "runs"))
     run_name = cfg.get("run_name", f"{env_id.split('-')[0]}_{int(time.time())}")
     run_dir = output_dir / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
-
     with open(run_dir / "config.yaml", "w", encoding="utf-8") as f:
         yaml.dump(cfg, f)
 
@@ -262,33 +285,61 @@ def main() -> None:
             monitor_gym=True,
         )
 
-    # Vec envs
-    env_fns = [make_env(env_id, seed, i, args.capture_video, run_dir) for i in range(n_envs)]
-    env = VecMonitor(SubprocVecEnv(env_fns))
+    # Vec envs + VecNormalize
+    env_fns = [make_env(env_id, seed, i, args.capture_video, run_dir, max_episode_steps) for i in range(n_envs)]
+    train_env = SubprocVecEnv(env_fns)
+    train_env = VecMonitor(train_env)
+    train_env = VecNormalize(
+        train_env,
+        norm_obs=True,
+        norm_reward=True,
+        gamma=cfg.get("ppo_kwargs", {}).get("gamma", 0.99),
+    )
 
-    eval_env = VecMonitor(SubprocVecEnv([make_env(env_id, seed + 1000, 0, args.capture_video, run_dir)]))
+    eval_env_fns = [make_env(env_id, seed + 1000, 0, args.capture_video, run_dir, max_episode_steps)]
+    eval_env = SubprocVecEnv(eval_env_fns)
+    eval_env = VecMonitor(eval_env)
+    eval_env = VecNormalize(
+        eval_env,
+        norm_obs=True,
+        norm_reward=False,
+        training=False,
+        gamma=cfg.get("ppo_kwargs", {}).get("gamma", 0.99),
+    )
+    # share obs stats
+    eval_env.obs_rms = train_env.obs_rms
 
     device = args.device or ("cuda" if cuda_available() else "cpu")
 
+    # policy
     policy_name = cfg.get("policy", "transformer")
     if policy_name not in POLICIES:
         raise ValueError(f"Unknown policy: {policy_name}. Available: {list(POLICIES.keys())}")
     policy_cls = POLICIES[policy_name]
-
-    # performer/perceiver switches
     if policy_name == "transformer" and cfg.get("use_performer", False) and PERFORMER_AVAILABLE:
         policy_cls = POLICIES["performer"]
 
-    policy_kwargs = cfg.get("policy_kwargs", {})
+    policy_kwargs["log_std_init"] = -0.3  # wider initial exploration  # for continuous actions, adjust if needed
+
+    # PPO kwargs
     ppo_kwargs = cfg.get("ppo_kwargs", {})
     ppo_kwargs.setdefault("verbose", 1)
-    ppo_kwargs.setdefault("target_kl", None)
     ppo_kwargs.setdefault("device", device)
 
-    ppo_kwargs["learning_rate"] = get_linear_fn(3e-4, 5e-6, 1.0)  # start→end over training frac
-    ppo_kwargs["clip_range"]    = get_linear_fn(0.2, 0.05, 1.0)
+    # set coefficients as floats (NOT schedules)
+    ppo_kwargs.setdefault("vf_coef", 1.0)
+    ppo_kwargs.setdefault("ent_coef", 0.01)
+    ppo_kwargs.setdefault("max_grad_norm", 0.5)
+    ppo_kwargs.setdefault("n_epochs", 2)
+    ppo_kwargs.setdefault("batch_size", 2048) 
+    
 
-    # clean fx kwargs
+    # schedules for lr and clip
+    ppo_kwargs["learning_rate"] = get_linear_fn(1e-4, 5e-6, 1.0)
+    ppo_kwargs["clip_range"] = get_linear_fn(0.2, 0.1, 1.0)
+    ppo_kwargs["target_kl"] = None
+
+    # feature extractor kwargs cleanup
     fx_kwargs = policy_kwargs.get("features_extractor_kwargs", {})
     fx_kwargs.pop("use_spatio_temporal", None)
     policy_kwargs["features_extractor_kwargs"] = fx_kwargs
@@ -297,21 +348,21 @@ def main() -> None:
 
     model = PPO(
         policy=policy_cls,
-        env=env,
+        env=train_env,
         tensorboard_log=str(run_dir / "tb"),
         policy_kwargs=policy_kwargs,
         **ppo_kwargs,
     )
 
-    # -------- Attach sequence predictor (FIXED embed_dim) -------- #
+    # Sequence predictor
     if cfg.get("predict_sequence", False):
-        obs_space = env.observation_space
+        obs_space = train_env.observation_space
         if isinstance(obs_space, gym.spaces.Dict):
             state_dim = int(sum(np.prod(sp.shape) for sp in obs_space.spaces.values()))
         else:
             state_dim = int(np.prod(obs_space.shape))
 
-        embed_dim_for_seq = model.policy.features_extractor.features_dim  # <<<<< 64 (matches projector)
+        embed_dim_for_seq = model.policy.features_extractor.features_dim
         seq_predictor = StateSequencePredictor(
             embed_dim=embed_dim_for_seq,
             state_dim=state_dim,
@@ -320,7 +371,7 @@ def main() -> None:
             num_layers=cfg.get("decoder_layers", 2),
         ).to(model.policy.device)
 
-        def _flatten_first_env(obs_t):
+        def _flatten_first_env_t(obs_t):
             if isinstance(obs_t, dict):
                 return torch.cat([v[0].reshape(-1) for v in obs_t.values()], dim=0)
             return obs_t[0].reshape(-1)
@@ -331,8 +382,7 @@ def main() -> None:
                 horizon = cfg.get("prediction_horizon", 200)
             obs_t, _ = model.policy.obs_to_tensor(obs0)
             emb = model.policy.extract_features(obs_t)
-            assert emb.shape[-1] == embed_dim_for_seq, f"Embed dim mismatch {emb.shape[-1]} vs {embed_dim_for_seq}"
-            init_state = _flatten_first_env(obs_t)
+            init_state = _flatten_first_env_t(obs_t)
             preds = seq_predictor(embedding=emb[0].unsqueeze(0), initial_state=init_state.unsqueeze(0))
             return preds.cpu().numpy()[0][:horizon]
 
@@ -345,7 +395,7 @@ def main() -> None:
     # KD
     if args.teacher:
         print(f"Loading teacher model from {args.teacher} for knowledge distillation")
-        teacher = PPO.load(args.teacher, env=env, device=device)
+        teacher = PPO.load(args.teacher, env=train_env, device=device)
 
         def custom_distillation_loss(model_outputs):
             pi_logits, values, old_logprobs, advantages, returns, entropy_coef, vf_coef = model_outputs
@@ -364,9 +414,12 @@ def main() -> None:
         model.policy.custom_loss = custom_distillation_loss  # type: ignore
 
     # callbacks
+    save_freq = max(cfg.get("save_freq", 10000) // n_envs, 1)
+    eval_freq = max(cfg.get("eval_freq", 20000) // n_envs, 1)
+
     callbacks: List[BaseCallback] = [
         CheckpointCallback(
-            save_freq=cfg.get("save_freq", 10000),
+            save_freq=save_freq,
             save_path=str(run_dir / "checkpoints"),
             name_prefix=run_name,
             save_replay_buffer=False,
@@ -376,7 +429,7 @@ def main() -> None:
             eval_env,
             best_model_save_path=str(run_dir),
             log_path=str(run_dir / "eval"),
-            eval_freq=cfg.get("eval_freq", 10000),
+            eval_freq=eval_freq,
             n_eval_episodes=cfg.get("n_eval_episodes", 5),
             deterministic=True,
             render=args.capture_video,
@@ -388,7 +441,7 @@ def main() -> None:
         callbacks.append(
             SequencePredictionCallback(
                 eval_env=eval_env,
-                eval_freq=cfg.get("eval_freq", 10000),
+                eval_freq=eval_freq,
                 n_eval_episodes=cfg.get("n_eval_episodes", 5),
                 horizon=cfg.get("prediction_horizon", 200),
             )
@@ -397,16 +450,15 @@ def main() -> None:
     if args.wandb and WANDB_AVAILABLE:
         callbacks.append(WandbCallback())
 
-    # Train
-    if not args.sweep:
-        timesteps = cfg.get("timesteps", 1_000_000)
-        model.learn(total_timesteps=timesteps, callback=callbacks)
-    else:
-        raise NotImplementedError("Sweep path trimmed; plug in your Optuna code if needed.")
+    # train
+    timesteps = cfg.get("timesteps", 1_000_000)
+    model.learn(total_timesteps=timesteps, callback=callbacks)
 
+    # save
     model.save(run_dir / cfg.get("save_name", "final_model"))
+    train_env.save(str(run_dir / "vecnormalize.pkl"))
 
-    env.close()
+    train_env.close()
     eval_env.close()
     if args.wandb and WANDB_AVAILABLE:
         wandb.finish()

@@ -13,7 +13,7 @@ max_episode_steps: 1000
 # ───────── Transformer policy ─────────
 policy: transformer
 policy_kwargs:
-  log_std_init: -2.0                   # lower initial exploration for continuous actions
+  log_std_init: -1.5                   # lower initial exploration for continuous actions
   transformer_kwargs:
     embed_dim: 512
     depth: 8

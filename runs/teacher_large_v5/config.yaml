@@ -6,7 +6,7 @@ n_eval_episodes: 10
 output_dir: runs
 policy: transformer
 policy_kwargs:
-  log_std_init: -2.0
+  log_std_init: -1.5
   transformer_kwargs:
     depth: 8
     dropout: 0.1

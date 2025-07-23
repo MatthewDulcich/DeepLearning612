@@ -5,7 +5,7 @@
 #SBATCH --qos=cml-medium
 #SBATCH --gres=gpu:a100:1              # Request one A100 GPU
 #SBATCH --cpus-per-task=8              # Request 8 CPU cores
-#SBATCH --mem=64G                      # Request 64GB of memory
+#SBATCH --mem=128G                      # Request 64GB of memory
 #SBATCH --time=04:00:00                # Job time limit (4 hours)
 #SBATCH --output=slurm-%j.out          # Log file for job output
 
@@ -20,8 +20,11 @@ module load Python3/3.11.2
 cd /cmlscratch/advait25/drone_transformer_rl
 source drone_venv/bin/activate
 
+# --- Add src directory to Python's path ---
+export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"  # <-- ADD THIS LINE
+
 # --- Run the training command for the large teacher model ---
-python -m src.drone_rl.train.train \
+python -m drone_rl.train.train \
   --config configs/teacher_large.yaml \
   --wandb
 
