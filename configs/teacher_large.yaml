@@ -1,34 +1,52 @@
-# Large Transformer teacher configuration
-env_id: FlyCraft-Nav-v0
-run_name: teacher_large
+# ─────────────────────────────────────────
+#   Large Transformer “teacher” – tuned
+# ─────────────────────────────────────────
+env_id: FlyCraft-v0
+run_name: teacher_large_v5
 output_dir: runs
 seed: 42
+
+# ───────── Parallel rollout settings ─────────
 n_envs: 16
 max_episode_steps: 1000
 
+# ───────── Transformer policy ─────────
 policy: transformer
 policy_kwargs:
+  log_std_init: -2.0                   # lower initial exploration for continuous actions
   transformer_kwargs:
     embed_dim: 512
     depth: 8
     num_heads: 16
     dropout: 0.1
     memory_size: 128
+    proj_out_dim: 256                  # must match your features_extractor projector
 
+# ───────── PPO hyper-parameters ─────────
 ppo_kwargs:
-  learning_rate: 3.0e-4
-  n_steps: 2048
+
+  n_steps: 2048                        # 16 * 2048 = 32768 samples / iter
   batch_size: 4096
   n_epochs: 4
-  gamma: 0.995
+  learning_rate: 1.0e-4                # more stable than 3e-4 for this big net
+  gamma: 0.997
   gae_lambda: 0.95
-  clip_range: 0.2
+  clip_range: 0.2                      # let PPO clip do the work
+  clip_range_vf: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  target_kl: null                      # or set to null to disable early stop
 
-timesteps: 5000000
-save_freq: 50000
-eval_freq: 20000
+# ───────── Training length ─────────
+timesteps: 5_000_000
+
+# ───────── Logging / checkpoints ─────────
+save_freq: 50_000
+eval_freq: 20_000
 n_eval_episodes: 10
 
+# ───────── Optional features ─────────
 use_spatio_temporal: true
 predict_sequence: true
 prediction_horizon: 200

@@ -1,0 +1,29 @@
+env_id: FlyCraft-v0
+eval_freq: 20000
+max_episode_steps: 1000
+n_envs: 16
+n_eval_episodes: 10
+output_dir: runs
+policy: transformer
+policy_kwargs:
+  transformer_kwargs:
+    depth: 8
+    dropout: 0.1
+    embed_dim: 512
+    memory_size: 128
+    num_heads: 16
+ppo_kwargs:
+  batch_size: 4096
+  clip_range: 0.2
+  gae_lambda: 0.95
+  gamma: 0.995
+  learning_rate: 0.0003
+  n_epochs: 4
+  n_steps: 2048
+predict_sequence: true
+prediction_horizon: 200
+run_name: teacher_large
+save_freq: 50000
+seed: 42
+timesteps: 5000000
+use_spatio_temporal: true
