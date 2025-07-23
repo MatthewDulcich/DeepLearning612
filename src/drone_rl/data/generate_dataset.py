@@ -45,6 +45,69 @@ except ImportError:
 
 # ------------------------- utilities ------------------------- #
 
+# ---- ADD THIS NEW FUNCTION ----
+# ---- REPLACE buffer_to_dataframe WITH THIS ----
+def buffer_to_dataframe(buffer: Dict[str, list]) -> pd.DataFrame:
+    """
+    Flatten the episode buffer into 1D columns where each row = one transition.
+    Works for:
+      - dict observations (obs / next_obs)
+      - multi-D arrays (action, etc.)
+      - optional metrics
+    """
+    flat = {}
+
+    def safe_concat(seq):
+        return np.concatenate([np.atleast_1d(x) for x in seq]) if seq else np.array([])
+
+    def flatten_array(prefix: str, arr: np.ndarray):
+        """Split (T, d1, d2, …) into 1D columns (keep T)."""
+        arr = np.asarray(arr)
+        if arr.ndim == 1:
+            flat[prefix] = arr
+        else:
+            for i in range(arr.shape[1]):
+                flatten_array(f"{prefix}_{i}", arr[:, i])
+
+    # Figure out if obs are dicts
+    dict_obs = isinstance(buffer["obs"][0], dict)
+
+    if dict_obs:
+        # Handle obs / next_obs per subkey using the original list of dicts
+        for major in ["obs", "next_obs"]:
+            if buffer[major]:
+                keys = buffer[major][0].keys()
+                for subk in keys:
+                    arr = safe_concat([ep[subk] for ep in buffer[major]])
+                    flatten_array(f"{major}_{subk}", arr)
+
+        # Everything else (reward, done, action, metrics…)
+        for k, seq in buffer.items():
+            if k in ["obs", "next_obs"] or not seq:
+                continue
+            arr = safe_concat(seq)
+            flatten_array(k, arr)
+    else:
+        # Simple case: obs already arrays
+        for k, seq in buffer.items():
+            if not seq:
+                continue
+            arr = safe_concat(seq)
+            flatten_array(k, arr)
+
+    # Consistency check
+    lengths = {k: len(v) for k, v in flat.items()}
+    N = max(lengths.values()) if lengths else 0
+    if not all(l == N for l in lengths.values()):
+        print("\n--- DEBUG: Inconsistent array lengths ---")
+        for k, l in sorted(lengths.items()):
+            print(f"  - {k}: {l}")
+        print(f"Expected: {N}")
+        raise ValueError("Array lengths mismatch after flattening")
+
+    return pd.DataFrame(flat)
+# ---- END REPLACEMENT ----
+
 def randomise_env(env: gym.Env, seed: int, terrain_ids: List[int]) -> Dict:  # noqa: D401
     """Apply domain randomisation to the FlyCraft environment.
     
@@ -409,56 +472,22 @@ def main() -> None:  # noqa: D401
         # Flush shard if large enough
         buffer_size = sum(len(b) for b in buffer["obs"])
         if buffer_size >= shard_size:
-            # Convert to DataFrame
             shard_path = out_dir / f"part-{shard_idx:04d}.parquet"
-            
-            # Handle dictionary observations
-            if isinstance(buffer["obs"][0], dict):
-                # Flatten observation dictionaries for storage
-                flat_buffer = {}
-                for k in buffer:
-                    if k in ["obs", "next_obs"]:
-                        # Each key in the observation becomes a column
-                        for obs_key in buffer[k][0].keys():
-                            flat_buffer[f"{k}_{obs_key}"] = np.concatenate([
-                                obs_dict[obs_key] for obs_dict in buffer[k]
-                            ])
-                    else:
-                        flat_buffer[k] = np.concatenate(buffer[k])
-                df = pd.DataFrame(flat_buffer)
-            else:
-                # Standard array observations
-                df = pd.DataFrame({k: np.concatenate(v) for k, v in buffer.items()})
-            
-            # Write to parquet
+            df = buffer_to_dataframe(buffer) # Use the new helper function
             df.to_parquet(shard_path)
-            
+
             # Clear buffer
             for k in buffer:
                 buffer[k].clear()
-            
+
             shard_idx += 1
 
     # Flush remaining data
-    if buffer["obs"]:
+    if any(v for v in buffer.values()):
         shard_path = out_dir / f"part-{shard_idx:04d}.parquet"
-        
-        # Handle dictionary observations (same as above)
-        if isinstance(buffer["obs"][0], dict):
-            flat_buffer = {}
-            for k in buffer:
-                if k in ["obs", "next_obs"]:
-                    for obs_key in buffer[k][0].keys():
-                        flat_buffer[f"{k}_{obs_key}"] = np.concatenate([
-                            obs_dict[obs_key] for obs_dict in buffer[k]
-                        ])
-                else:
-                    flat_buffer[k] = np.concatenate(buffer[k])
-            df = pd.DataFrame(flat_buffer)
-        else:
-            df = pd.DataFrame({k: np.concatenate(v) for k, v in buffer.items()})
-        
+        df = buffer_to_dataframe(buffer) # Use the new helper function again
         df.to_parquet(shard_path)
+    # ---- REPLACEMENT CODE ENDS HERE ----
 
     # Optionally merge with real-world data if provided
     if args.real_data and os.path.exists(args.real_data):
