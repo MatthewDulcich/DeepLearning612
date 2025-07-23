@@ -319,33 +319,45 @@ def main() -> None:
     if policy_name == "transformer" and cfg.get("use_performer", False) and PERFORMER_AVAILABLE:
         policy_cls = POLICIES["performer"]
 
-    policy_kwargs["log_std_init"] = -0.3  # wider initial exploration  # for continuous actions, adjust if needed
+      # wider initial exploration  # for continuous actions, adjust if needed
 
-    # PPO kwargs
-    ppo_kwargs = cfg.get("ppo_kwargs", {})
-    ppo_kwargs.setdefault("verbose", 1)
-    ppo_kwargs.setdefault("device", device)
+    # --------- choose policy class ---------
+    policy_name = cfg.get("policy", "transformer")
+    if policy_name not in POLICIES:
+        raise ValueError(f"Unknown policy: {policy_name}. Available: {list(POLICIES.keys())}")
+    policy_cls = POLICIES[policy_name]
+    if policy_name == "transformer" and cfg.get("use_performer", False) and PERFORMER_AVAILABLE:
+        policy_cls = POLICIES["performer"]
 
-    # set coefficients as floats (NOT schedules)
-    ppo_kwargs.setdefault("vf_coef", 1.0)
-    ppo_kwargs.setdefault("ent_coef", 0.01)
-    ppo_kwargs.setdefault("max_grad_norm", 0.5)
-    ppo_kwargs.setdefault("n_epochs", 2)
-    ppo_kwargs.setdefault("batch_size", 2048) 
-    
+    # --------- POLICY KWARGS ---------
+    policy_kwargs = cfg.get("policy_kwargs", {})
+    # wider initial exploration for continuous action spaces
+    if isinstance(train_env.action_space, gym.spaces.Box):
+        policy_kwargs["log_std_init"] = -0.3
 
-    # schedules for lr and clip
-    ppo_kwargs["learning_rate"] = get_linear_fn(1e-4, 5e-6, 1.0)
-    ppo_kwargs["clip_range"] = get_linear_fn(0.2, 0.1, 1.0)
-    ppo_kwargs["target_kl"] = None
-
-    # feature extractor kwargs cleanup
+    # clean feature-extractor kwargs
     fx_kwargs = policy_kwargs.get("features_extractor_kwargs", {})
     fx_kwargs.pop("use_spatio_temporal", None)
     policy_kwargs["features_extractor_kwargs"] = fx_kwargs
     policy_kwargs.setdefault("transformer_kwargs", {})
     policy_kwargs["transformer_kwargs"].setdefault("attn_backend", "torch")
 
+    # --------- PPO KWARGS ---------
+    ppo_kwargs = cfg.get("ppo_kwargs", {})
+    ppo_kwargs.setdefault("verbose", 1)
+    ppo_kwargs.setdefault("device", device)
+    ppo_kwargs.setdefault("vf_coef", 1.0)        # prioritize critic a bit more
+    ppo_kwargs.setdefault("ent_coef", 0.01)
+    ppo_kwargs.setdefault("max_grad_norm", 0.5)
+    ppo_kwargs.setdefault("n_epochs", 2)
+    ppo_kwargs.setdefault("batch_size", 2048)
+
+    # schedules (override static if present)
+    ppo_kwargs["learning_rate"] = get_linear_fn(1e-4, 5e-6, 1.0)
+    ppo_kwargs["clip_range"]    = get_linear_fn(0.2, 0.1, 1.0)
+    ppo_kwargs["target_kl"]     = None  # use clip only, or set e.g. 0.02 if you want auto-early-stop
+
+    # --------- build model ---------
     model = PPO(
         policy=policy_cls,
         env=train_env,

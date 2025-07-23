@@ -2,7 +2,7 @@
 #SBATCH --job-name=teacher-train         # Name for your job
 #SBATCH --partition=cml-zhou           # Your dedicated partition with A100s
 #SBATCH --account=cml-zhou             # Your account
-#SBATCH --qos=cml-medium
+#SBATCH --qos=cml-high
 #SBATCH --gres=gpu:a100:1              # Request one A100 GPU
 #SBATCH --cpus-per-task=8              # Request 8 CPU cores
 #SBATCH --mem=128G                      # Request 64GB of memory
