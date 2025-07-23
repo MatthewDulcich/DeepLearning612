@@ -1,0 +1,1818 @@
+{
+  "summary": {
+    "total_episodes": 300,
+    "total_transitions": 92412,
+    "terrains_used": [
+      4,
+      7,
+      2,
+      3,
+      5
+    ],
+    "avg_episode_length": 308.04,
+    "shards": 1,
+    "real_data_included": false
+  },
+  "episodes": [
+    {
+      "episode": 0,
+      "steps": 353,
+      "terrain": 5,
+      "return": -253.84035483865324
+    },
+    {
+      "episode": 1,
+      "steps": 399,
+      "terrain": 2,
+      "return": -206.55389301163856
+    },
+    {
+      "episode": 2,
+      "steps": 90,
+      "terrain": 5,
+      "return": -202.22980434402473
+    },
+    {
+      "episode": 3,
+      "steps": 399,
+      "terrain": 5,
+      "return": -165.1799255368025
+    },
+    {
+      "episode": 4,
+      "steps": 322,
+      "terrain": 3,
+      "return": -218.19936874064632
+    },
+    {
+      "episode": 5,
+      "steps": 52,
+      "terrain": 3,
+      "return": -205.67496349857072
+    },
+    {
+      "episode": 6,
+      "steps": 399,
+      "terrain": 2,
+      "return": -346.8712161263714
+    },
+    {
+      "episode": 7,
+      "steps": 399,
+      "terrain": 5,
+      "return": -282.2661723603212
+    },
+    {
+      "episode": 8,
+      "steps": 399,
+      "terrain": 3,
+      "return": -357.5572016293671
+    },
+    {
+      "episode": 9,
+      "steps": 399,
+      "terrain": 2,
+      "return": -191.98011462499207
+    },
+    {
+      "episode": 10,
+      "steps": 352,
+      "terrain": 3,
+      "return": -302.82880764503034
+    },
+    {
+      "episode": 11,
+      "steps": 94,
+      "terrain": 4,
+      "return": -200.57807043191016
+    },
+    {
+      "episode": 12,
+      "steps": 377,
+      "terrain": 3,
+      "return": -218.51328340112744
+    },
+    {
+      "episode": 13,
+      "steps": 399,
+      "terrain": 5,
+      "return": -273.72513890390667
+    },
+    {
+      "episode": 14,
+      "steps": 88,
+      "terrain": 4,
+      "return": -232.99655436507555
+    },
+    {
+      "episode": 15,
+      "steps": 399,
+      "terrain": 5,
+      "return": -315.43800197921394
+    },
+    {
+      "episode": 16,
+      "steps": 399,
+      "terrain": 2,
+      "return": -217.59760479945103
+    },
+    {
+      "episode": 17,
+      "steps": 399,
+      "terrain": 3,
+      "return": -278.17474454945443
+    },
+    {
+      "episode": 18,
+      "steps": 399,
+      "terrain": 5,
+      "return": -348.3606355443401
+    },
+    {
+      "episode": 19,
+      "steps": 399,
+      "terrain": 2,
+      "return": -304.2947289519672
+    },
+    {
+      "episode": 20,
+      "steps": 335,
+      "terrain": 5,
+      "return": -250.7134944268886
+    },
+    {
+      "episode": 21,
+      "steps": 127,
+      "terrain": 7,
+      "return": -216.95225567702857
+    },
+    {
+      "episode": 22,
+      "steps": 399,
+      "terrain": 3,
+      "return": -263.0104942077492
+    },
+    {
+      "episode": 23,
+      "steps": 386,
+      "terrain": 4,
+      "return": -297.1304163170756
+    },
+    {
+      "episode": 24,
+      "steps": 399,
+      "terrain": 7,
+      "return": -231.01864479041654
+    },
+    {
+      "episode": 25,
+      "steps": 374,
+      "terrain": 2,
+      "return": -295.22137364216405
+    },
+    {
+      "episode": 26,
+      "steps": 373,
+      "terrain": 5,
+      "return": -299.9467298551643
+    },
+    {
+      "episode": 27,
+      "steps": 137,
+      "terrain": 4,
+      "return": -247.23252228071973
+    },
+    {
+      "episode": 28,
+      "steps": 399,
+      "terrain": 3,
+      "return": -324.88545087474415
+    },
+    {
+      "episode": 29,
+      "steps": 265,
+      "terrain": 5,
+      "return": -235.08452890494505
+    },
+    {
+      "episode": 30,
+      "steps": 56,
+      "terrain": 4,
+      "return": -212.27943712535117
+    },
+    {
+      "episode": 31,
+      "steps": 399,
+      "terrain": 2,
+      "return": -249.58082199700286
+    },
+    {
+      "episode": 32,
+      "steps": 258,
+      "terrain": 5,
+      "return": -247.06722457913958
+    },
+    {
+      "episode": 33,
+      "steps": 399,
+      "terrain": 5,
+      "return": -189.7031026681007
+    },
+    {
+      "episode": 34,
+      "steps": 399,
+      "terrain": 4,
+      "return": -274.9440369301894
+    },
+    {
+      "episode": 35,
+      "steps": 132,
+      "terrain": 4,
+      "return": -221.71398867862925
+    },
+    {
+      "episode": 36,
+      "steps": 70,
+      "terrain": 7,
+      "return": -197.10143888840713
+    },
+    {
+      "episode": 37,
+      "steps": 399,
+      "terrain": 4,
+      "return": -338.44252003961736
+    },
+    {
+      "episode": 38,
+      "steps": 379,
+      "terrain": 7,
+      "return": -259.7387908831156
+    },
+    {
+      "episode": 39,
+      "steps": 399,
+      "terrain": 5,
+      "return": -187.41978480693066
+    },
+    {
+      "episode": 40,
+      "steps": 314,
+      "terrain": 2,
+      "return": -268.7208716704642
+    },
+    {
+      "episode": 41,
+      "steps": 399,
+      "terrain": 3,
+      "return": -291.9903278907394
+    },
+    {
+      "episode": 42,
+      "steps": 84,
+      "terrain": 4,
+      "return": -218.11897962257353
+    },
+    {
+      "episode": 43,
+      "steps": 399,
+      "terrain": 2,
+      "return": -290.50510986718785
+    },
+    {
+      "episode": 44,
+      "steps": 399,
+      "terrain": 3,
+      "return": -197.16386305518395
+    },
+    {
+      "episode": 45,
+      "steps": 399,
+      "terrain": 5,
+      "return": -318.23718571246195
+    },
+    {
+      "episode": 46,
+      "steps": 46,
+      "terrain": 2,
+      "return": -203.5970566380209
+    },
+    {
+      "episode": 47,
+      "steps": 399,
+      "terrain": 4,
+      "return": -302.85172504632425
+    },
+    {
+      "episode": 48,
+      "steps": 399,
+      "terrain": 4,
+      "return": -294.4357269158615
+    },
+    {
+      "episode": 49,
+      "steps": 44,
+      "terrain": 4,
+      "return": -202.7790030710351
+    },
+    {
+      "episode": 50,
+      "steps": 399,
+      "terrain": 3,
+      "return": -298.42973948643913
+    },
+    {
+      "episode": 51,
+      "steps": 399,
+      "terrain": 7,
+      "return": -288.2033501319541
+    },
+    {
+      "episode": 52,
+      "steps": 112,
+      "terrain": 5,
+      "return": -228.6942706676049
+    },
+    {
+      "episode": 53,
+      "steps": 399,
+      "terrain": 3,
+      "return": -302.0125588410979
+    },
+    {
+      "episode": 54,
+      "steps": 399,
+      "terrain": 7,
+      "return": -339.03503264763225
+    },
+    {
+      "episode": 55,
+      "steps": 399,
+      "terrain": 5,
+      "return": -248.07434264265297
+    },
+    {
+      "episode": 56,
+      "steps": 399,
+      "terrain": 7,
+      "return": -350.7019267400801
+    },
+    {
+      "episode": 57,
+      "steps": 271,
+      "terrain": 4,
+      "return": -307.86495261248876
+    },
+    {
+      "episode": 58,
+      "steps": 34,
+      "terrain": 2,
+      "return": -194.13959229920374
+    },
+    {
+      "episode": 59,
+      "steps": 70,
+      "terrain": 3,
+      "return": -216.96521376817708
+    },
+    {
+      "episode": 60,
+      "steps": 399,
+      "terrain": 4,
+      "return": -200.26240383905395
+    },
+    {
+      "episode": 61,
+      "steps": 94,
+      "terrain": 2,
+      "return": -203.21338595226013
+    },
+    {
+      "episode": 62,
+      "steps": 399,
+      "terrain": 2,
+      "return": -315.4439629972146
+    },
+    {
+      "episode": 63,
+      "steps": 399,
+      "terrain": 2,
+      "return": -259.26159230677035
+    },
+    {
+      "episode": 64,
+      "steps": 121,
+      "terrain": 2,
+      "return": -248.2037382945842
+    },
+    {
+      "episode": 65,
+      "steps": 237,
+      "terrain": 4,
+      "return": -264.0412197814269
+    },
+    {
+      "episode": 66,
+      "steps": 221,
+      "terrain": 5,
+      "return": -210.8120201271023
+    },
+    {
+      "episode": 67,
+      "steps": 38,
+      "terrain": 3,
+      "return": -184.04787905228494
+    },
+    {
+      "episode": 68,
+      "steps": 219,
+      "terrain": 2,
+      "return": -254.95395371184532
+    },
+    {
+      "episode": 69,
+      "steps": 399,
+      "terrain": 4,
+      "return": -317.7306863102562
+    },
+    {
+      "episode": 70,
+      "steps": 399,
+      "terrain": 3,
+      "return": -222.69672622676964
+    },
+    {
+      "episode": 71,
+      "steps": 190,
+      "terrain": 5,
+      "return": -228.19888948092523
+    },
+    {
+      "episode": 72,
+      "steps": 399,
+      "terrain": 5,
+      "return": -344.8898482154247
+    },
+    {
+      "episode": 73,
+      "steps": 399,
+      "terrain": 5,
+      "return": -223.00490429654548
+    },
+    {
+      "episode": 74,
+      "steps": 135,
+      "terrain": 4,
+      "return": -208.1145751938421
+    },
+    {
+      "episode": 75,
+      "steps": 399,
+      "terrain": 3,
+      "return": -299.9815266907475
+    },
+    {
+      "episode": 76,
+      "steps": 399,
+      "terrain": 2,
+      "return": -342.4183965016148
+    },
+    {
+      "episode": 77,
+      "steps": 35,
+      "terrain": 4,
+      "return": -190.11748569885887
+    },
+    {
+      "episode": 78,
+      "steps": 146,
+      "terrain": 3,
+      "return": -258.86691346604
+    },
+    {
+      "episode": 79,
+      "steps": 293,
+      "terrain": 4,
+      "return": -246.8237640143787
+    },
+    {
+      "episode": 80,
+      "steps": 395,
+      "terrain": 5,
+      "return": -300.1752569520753
+    },
+    {
+      "episode": 81,
+      "steps": 399,
+      "terrain": 4,
+      "return": -290.6233530031835
+    },
+    {
+      "episode": 82,
+      "steps": 59,
+      "terrain": 3,
+      "return": -194.7646122584971
+    },
+    {
+      "episode": 83,
+      "steps": 399,
+      "terrain": 3,
+      "return": -243.42026807382055
+    },
+    {
+      "episode": 84,
+      "steps": 399,
+      "terrain": 3,
+      "return": -229.54200727479116
+    },
+    {
+      "episode": 85,
+      "steps": 305,
+      "terrain": 3,
+      "return": -270.46791408346405
+    },
+    {
+      "episode": 86,
+      "steps": 301,
+      "terrain": 5,
+      "return": -304.85273729384824
+    },
+    {
+      "episode": 87,
+      "steps": 399,
+      "terrain": 3,
+      "return": -285.28323699868383
+    },
+    {
+      "episode": 88,
+      "steps": 399,
+      "terrain": 2,
+      "return": -350.7017977458942
+    },
+    {
+      "episode": 89,
+      "steps": 124,
+      "terrain": 5,
+      "return": -247.68893766145393
+    },
+    {
+      "episode": 90,
+      "steps": 399,
+      "terrain": 3,
+      "return": -250.45712702056574
+    },
+    {
+      "episode": 91,
+      "steps": 355,
+      "terrain": 3,
+      "return": -365.3244005634956
+    },
+    {
+      "episode": 92,
+      "steps": 399,
+      "terrain": 2,
+      "return": -291.3085907039508
+    },
+    {
+      "episode": 93,
+      "steps": 399,
+      "terrain": 5,
+      "return": -300.6445374049192
+    },
+    {
+      "episode": 94,
+      "steps": 399,
+      "terrain": 4,
+      "return": -339.8768221069004
+    },
+    {
+      "episode": 95,
+      "steps": 399,
+      "terrain": 2,
+      "return": -366.2341635321964
+    },
+    {
+      "episode": 96,
+      "steps": 102,
+      "terrain": 5,
+      "return": -230.01436255051033
+    },
+    {
+      "episode": 97,
+      "steps": 223,
+      "terrain": 4,
+      "return": -309.8654454287665
+    },
+    {
+      "episode": 98,
+      "steps": 389,
+      "terrain": 7,
+      "return": -246.71524561028747
+    },
+    {
+      "episode": 99,
+      "steps": 399,
+      "terrain": 5,
+      "return": -293.0468706095052
+    },
+    {
+      "episode": 100,
+      "steps": 399,
+      "terrain": 3,
+      "return": -274.8389315651664
+    },
+    {
+      "episode": 101,
+      "steps": 373,
+      "terrain": 7,
+      "return": -260.0959843970903
+    },
+    {
+      "episode": 102,
+      "steps": 375,
+      "terrain": 2,
+      "return": -212.5408339016117
+    },
+    {
+      "episode": 103,
+      "steps": 399,
+      "terrain": 2,
+      "return": -197.33624283436046
+    },
+    {
+      "episode": 104,
+      "steps": 399,
+      "terrain": 3,
+      "return": -213.3899955922344
+    },
+    {
+      "episode": 105,
+      "steps": 120,
+      "terrain": 7,
+      "return": -220.41601917316706
+    },
+    {
+      "episode": 106,
+      "steps": 63,
+      "terrain": 2,
+      "return": -189.7877138198653
+    },
+    {
+      "episode": 107,
+      "steps": 399,
+      "terrain": 4,
+      "return": -286.1255427764908
+    },
+    {
+      "episode": 108,
+      "steps": 399,
+      "terrain": 4,
+      "return": -214.01334946822723
+    },
+    {
+      "episode": 109,
+      "steps": 206,
+      "terrain": 2,
+      "return": -303.6847252984518
+    },
+    {
+      "episode": 110,
+      "steps": 312,
+      "terrain": 2,
+      "return": -312.68315305376814
+    },
+    {
+      "episode": 111,
+      "steps": 399,
+      "terrain": 2,
+      "return": -282.89868683009513
+    },
+    {
+      "episode": 112,
+      "steps": 98,
+      "terrain": 4,
+      "return": -222.4956223557302
+    },
+    {
+      "episode": 113,
+      "steps": 399,
+      "terrain": 7,
+      "return": -236.66968137602746
+    },
+    {
+      "episode": 114,
+      "steps": 229,
+      "terrain": 4,
+      "return": -254.8867324318199
+    },
+    {
+      "episode": 115,
+      "steps": 399,
+      "terrain": 3,
+      "return": -238.02922776775688
+    },
+    {
+      "episode": 116,
+      "steps": 399,
+      "terrain": 7,
+      "return": -163.8210038440959
+    },
+    {
+      "episode": 117,
+      "steps": 235,
+      "terrain": 4,
+      "return": -257.5416288265553
+    },
+    {
+      "episode": 118,
+      "steps": 110,
+      "terrain": 7,
+      "return": -228.90816850766325
+    },
+    {
+      "episode": 119,
+      "steps": 399,
+      "terrain": 2,
+      "return": -298.74208701191617
+    },
+    {
+      "episode": 120,
+      "steps": 399,
+      "terrain": 7,
+      "return": -250.1448031084032
+    },
+    {
+      "episode": 121,
+      "steps": 399,
+      "terrain": 7,
+      "return": -281.91838684763025
+    },
+    {
+      "episode": 122,
+      "steps": 125,
+      "terrain": 5,
+      "return": -249.1136026986562
+    },
+    {
+      "episode": 123,
+      "steps": 79,
+      "terrain": 4,
+      "return": -190.5361115366826
+    },
+    {
+      "episode": 124,
+      "steps": 399,
+      "terrain": 5,
+      "return": -307.15955635550574
+    },
+    {
+      "episode": 125,
+      "steps": 399,
+      "terrain": 2,
+      "return": -366.08072845045484
+    },
+    {
+      "episode": 126,
+      "steps": 89,
+      "terrain": 7,
+      "return": -213.20340028367286
+    },
+    {
+      "episode": 127,
+      "steps": 399,
+      "terrain": 2,
+      "return": -267.69091518471134
+    },
+    {
+      "episode": 128,
+      "steps": 399,
+      "terrain": 3,
+      "return": -305.0715982819564
+    },
+    {
+      "episode": 129,
+      "steps": 101,
+      "terrain": 2,
+      "return": -218.62109135121224
+    },
+    {
+      "episode": 130,
+      "steps": 268,
+      "terrain": 3,
+      "return": -273.4055126844576
+    },
+    {
+      "episode": 131,
+      "steps": 52,
+      "terrain": 2,
+      "return": -203.9015710164922
+    },
+    {
+      "episode": 132,
+      "steps": 399,
+      "terrain": 5,
+      "return": -302.2892935112569
+    },
+    {
+      "episode": 133,
+      "steps": 399,
+      "terrain": 2,
+      "return": -210.70697852299105
+    },
+    {
+      "episode": 134,
+      "steps": 196,
+      "terrain": 3,
+      "return": -285.67975601794006
+    },
+    {
+      "episode": 135,
+      "steps": 399,
+      "terrain": 2,
+      "return": -288.923522891935
+    },
+    {
+      "episode": 136,
+      "steps": 399,
+      "terrain": 5,
+      "return": -329.40987573761026
+    },
+    {
+      "episode": 137,
+      "steps": 399,
+      "terrain": 2,
+      "return": -340.8112019446753
+    },
+    {
+      "episode": 138,
+      "steps": 340,
+      "terrain": 3,
+      "return": -285.49814954752867
+    },
+    {
+      "episode": 139,
+      "steps": 399,
+      "terrain": 2,
+      "return": -266.4926515407948
+    },
+    {
+      "episode": 140,
+      "steps": 399,
+      "terrain": 3,
+      "return": -317.84890677321437
+    },
+    {
+      "episode": 141,
+      "steps": 399,
+      "terrain": 7,
+      "return": -260.4930143206664
+    },
+    {
+      "episode": 142,
+      "steps": 399,
+      "terrain": 4,
+      "return": -303.2323250453707
+    },
+    {
+      "episode": 143,
+      "steps": 332,
+      "terrain": 5,
+      "return": -285.4478390646895
+    },
+    {
+      "episode": 144,
+      "steps": 399,
+      "terrain": 7,
+      "return": -330.92200458917284
+    },
+    {
+      "episode": 145,
+      "steps": 399,
+      "terrain": 2,
+      "return": -332.56523390360746
+    },
+    {
+      "episode": 146,
+      "steps": 399,
+      "terrain": 5,
+      "return": -351.2493059288383
+    },
+    {
+      "episode": 147,
+      "steps": 399,
+      "terrain": 4,
+      "return": -279.19179149152876
+    },
+    {
+      "episode": 148,
+      "steps": 379,
+      "terrain": 4,
+      "return": -307.5702021249749
+    },
+    {
+      "episode": 149,
+      "steps": 359,
+      "terrain": 7,
+      "return": -288.0788755442535
+    },
+    {
+      "episode": 150,
+      "steps": 333,
+      "terrain": 2,
+      "return": -251.79812048677036
+    },
+    {
+      "episode": 151,
+      "steps": 162,
+      "terrain": 3,
+      "return": -252.85079966478406
+    },
+    {
+      "episode": 152,
+      "steps": 288,
+      "terrain": 3,
+      "return": -354.7024260273062
+    },
+    {
+      "episode": 153,
+      "steps": 399,
+      "terrain": 3,
+      "return": -155.7960770195867
+    },
+    {
+      "episode": 154,
+      "steps": 167,
+      "terrain": 7,
+      "return": -203.7232288378994
+    },
+    {
+      "episode": 155,
+      "steps": 350,
+      "terrain": 4,
+      "return": -304.303314580291
+    },
+    {
+      "episode": 156,
+      "steps": 369,
+      "terrain": 5,
+      "return": -288.8129288151821
+    },
+    {
+      "episode": 157,
+      "steps": 205,
+      "terrain": 4,
+      "return": -241.74110420681444
+    },
+    {
+      "episode": 158,
+      "steps": 399,
+      "terrain": 2,
+      "return": -377.6808053074621
+    },
+    {
+      "episode": 159,
+      "steps": 193,
+      "terrain": 5,
+      "return": -283.19683406244997
+    },
+    {
+      "episode": 160,
+      "steps": 335,
+      "terrain": 4,
+      "return": -297.14913010351233
+    },
+    {
+      "episode": 161,
+      "steps": 399,
+      "terrain": 5,
+      "return": -315.7100338852683
+    },
+    {
+      "episode": 162,
+      "steps": 399,
+      "terrain": 2,
+      "return": -342.8126234029741
+    },
+    {
+      "episode": 163,
+      "steps": 134,
+      "terrain": 2,
+      "return": -247.69879686516026
+    },
+    {
+      "episode": 164,
+      "steps": 399,
+      "terrain": 2,
+      "return": -230.82573060621792
+    },
+    {
+      "episode": 165,
+      "steps": 36,
+      "terrain": 2,
+      "return": -192.31489461688074
+    },
+    {
+      "episode": 166,
+      "steps": 331,
+      "terrain": 5,
+      "return": -274.525068044186
+    },
+    {
+      "episode": 167,
+      "steps": 225,
+      "terrain": 3,
+      "return": -260.65778197833333
+    },
+    {
+      "episode": 168,
+      "steps": 325,
+      "terrain": 7,
+      "return": -311.1374442146322
+    },
+    {
+      "episode": 169,
+      "steps": 399,
+      "terrain": 5,
+      "return": -255.17489090266898
+    },
+    {
+      "episode": 170,
+      "steps": 399,
+      "terrain": 3,
+      "return": -307.1663753591302
+    },
+    {
+      "episode": 171,
+      "steps": 95,
+      "terrain": 3,
+      "return": -235.261683966168
+    },
+    {
+      "episode": 172,
+      "steps": 399,
+      "terrain": 7,
+      "return": -178.94518639170676
+    },
+    {
+      "episode": 173,
+      "steps": 399,
+      "terrain": 5,
+      "return": -270.03272821172476
+    },
+    {
+      "episode": 174,
+      "steps": 399,
+      "terrain": 7,
+      "return": -229.19947241055553
+    },
+    {
+      "episode": 175,
+      "steps": 76,
+      "terrain": 3,
+      "return": -203.7525386658999
+    },
+    {
+      "episode": 176,
+      "steps": 399,
+      "terrain": 7,
+      "return": -209.06513922105898
+    },
+    {
+      "episode": 177,
+      "steps": 399,
+      "terrain": 3,
+      "return": -283.95459380005894
+    },
+    {
+      "episode": 178,
+      "steps": 145,
+      "terrain": 2,
+      "return": -218.30211545926767
+    },
+    {
+      "episode": 179,
+      "steps": 399,
+      "terrain": 5,
+      "return": -313.05540723448877
+    },
+    {
+      "episode": 180,
+      "steps": 358,
+      "terrain": 7,
+      "return": -213.42844099621271
+    },
+    {
+      "episode": 181,
+      "steps": 118,
+      "terrain": 3,
+      "return": -235.6522646971489
+    },
+    {
+      "episode": 182,
+      "steps": 399,
+      "terrain": 3,
+      "return": -217.7890263600144
+    },
+    {
+      "episode": 183,
+      "steps": 399,
+      "terrain": 5,
+      "return": -215.05707842270738
+    },
+    {
+      "episode": 184,
+      "steps": 305,
+      "terrain": 7,
+      "return": -281.5929887751594
+    },
+    {
+      "episode": 185,
+      "steps": 56,
+      "terrain": 7,
+      "return": -203.55734207873508
+    },
+    {
+      "episode": 186,
+      "steps": 399,
+      "terrain": 4,
+      "return": -195.02881841245528
+    },
+    {
+      "episode": 187,
+      "steps": 399,
+      "terrain": 2,
+      "return": -226.5697686756204
+    },
+    {
+      "episode": 188,
+      "steps": 399,
+      "terrain": 2,
+      "return": -313.2750149767367
+    },
+    {
+      "episode": 189,
+      "steps": 132,
+      "terrain": 7,
+      "return": -205.9945813403535
+    },
+    {
+      "episode": 190,
+      "steps": 399,
+      "terrain": 7,
+      "return": -218.45447633917203
+    },
+    {
+      "episode": 191,
+      "steps": 350,
+      "terrain": 4,
+      "return": -271.4014292990297
+    },
+    {
+      "episode": 192,
+      "steps": 379,
+      "terrain": 5,
+      "return": -288.6643508101512
+    },
+    {
+      "episode": 193,
+      "steps": 364,
+      "terrain": 3,
+      "return": -243.63053358845536
+    },
+    {
+      "episode": 194,
+      "steps": 217,
+      "terrain": 5,
+      "return": -282.0157863976989
+    },
+    {
+      "episode": 195,
+      "steps": 92,
+      "terrain": 7,
+      "return": -198.16107197124117
+    },
+    {
+      "episode": 196,
+      "steps": 210,
+      "terrain": 7,
+      "return": -233.49126964989068
+    },
+    {
+      "episode": 197,
+      "steps": 169,
+      "terrain": 5,
+      "return": -269.52540081859615
+    },
+    {
+      "episode": 198,
+      "steps": 40,
+      "terrain": 2,
+      "return": -193.50803944896165
+    },
+    {
+      "episode": 199,
+      "steps": 399,
+      "terrain": 2,
+      "return": -212.21884313797997
+    },
+    {
+      "episode": 200,
+      "steps": 399,
+      "terrain": 4,
+      "return": -245.6428546127783
+    },
+    {
+      "episode": 201,
+      "steps": 251,
+      "terrain": 7,
+      "return": -306.7118241602293
+    },
+    {
+      "episode": 202,
+      "steps": 399,
+      "terrain": 4,
+      "return": -374.10049683394726
+    },
+    {
+      "episode": 203,
+      "steps": 156,
+      "terrain": 7,
+      "return": -215.27228408249448
+    },
+    {
+      "episode": 204,
+      "steps": 399,
+      "terrain": 3,
+      "return": -303.2534764183478
+    },
+    {
+      "episode": 205,
+      "steps": 399,
+      "terrain": 2,
+      "return": -300.48807115662476
+    },
+    {
+      "episode": 206,
+      "steps": 399,
+      "terrain": 2,
+      "return": -252.9757031611541
+    },
+    {
+      "episode": 207,
+      "steps": 399,
+      "terrain": 4,
+      "return": -286.74232169838365
+    },
+    {
+      "episode": 208,
+      "steps": 334,
+      "terrain": 5,
+      "return": -316.80990766077167
+    },
+    {
+      "episode": 209,
+      "steps": 399,
+      "terrain": 3,
+      "return": -243.83524289176435
+    },
+    {
+      "episode": 210,
+      "steps": 239,
+      "terrain": 7,
+      "return": -305.26480049090964
+    },
+    {
+      "episode": 211,
+      "steps": 338,
+      "terrain": 4,
+      "return": -350.684224013338
+    },
+    {
+      "episode": 212,
+      "steps": 399,
+      "terrain": 4,
+      "return": -315.1968495006895
+    },
+    {
+      "episode": 213,
+      "steps": 40,
+      "terrain": 4,
+      "return": -198.96553001328553
+    },
+    {
+      "episode": 214,
+      "steps": 399,
+      "terrain": 4,
+      "return": -338.5439226120896
+    },
+    {
+      "episode": 215,
+      "steps": 399,
+      "terrain": 5,
+      "return": -243.11186438599512
+    },
+    {
+      "episode": 216,
+      "steps": 399,
+      "terrain": 5,
+      "return": -210.1557909874412
+    },
+    {
+      "episode": 217,
+      "steps": 399,
+      "terrain": 3,
+      "return": -255.34961882934184
+    },
+    {
+      "episode": 218,
+      "steps": 399,
+      "terrain": 2,
+      "return": -283.1808515453164
+    },
+    {
+      "episode": 219,
+      "steps": 349,
+      "terrain": 4,
+      "return": -301.1777184793702
+    },
+    {
+      "episode": 220,
+      "steps": 399,
+      "terrain": 3,
+      "return": -179.62863619169244
+    },
+    {
+      "episode": 221,
+      "steps": 396,
+      "terrain": 7,
+      "return": -307.25883500575014
+    },
+    {
+      "episode": 222,
+      "steps": 114,
+      "terrain": 2,
+      "return": -232.00300138966406
+    },
+    {
+      "episode": 223,
+      "steps": 399,
+      "terrain": 7,
+      "return": -346.8720594684993
+    },
+    {
+      "episode": 224,
+      "steps": 158,
+      "terrain": 5,
+      "return": -225.1344955439671
+    },
+    {
+      "episode": 225,
+      "steps": 359,
+      "terrain": 5,
+      "return": -227.06805087185018
+    },
+    {
+      "episode": 226,
+      "steps": 399,
+      "terrain": 5,
+      "return": -214.28665921453728
+    },
+    {
+      "episode": 227,
+      "steps": 399,
+      "terrain": 2,
+      "return": -311.15240916768005
+    },
+    {
+      "episode": 228,
+      "steps": 399,
+      "terrain": 3,
+      "return": -333.25911315797885
+    },
+    {
+      "episode": 229,
+      "steps": 214,
+      "terrain": 2,
+      "return": -260.2295739811515
+    },
+    {
+      "episode": 230,
+      "steps": 381,
+      "terrain": 2,
+      "return": -342.6783907739112
+    },
+    {
+      "episode": 231,
+      "steps": 134,
+      "terrain": 7,
+      "return": -232.66235880928323
+    },
+    {
+      "episode": 232,
+      "steps": 283,
+      "terrain": 3,
+      "return": -243.76207007280675
+    },
+    {
+      "episode": 233,
+      "steps": 150,
+      "terrain": 4,
+      "return": -267.36980473900815
+    },
+    {
+      "episode": 234,
+      "steps": 187,
+      "terrain": 2,
+      "return": -223.09918550771084
+    },
+    {
+      "episode": 235,
+      "steps": 367,
+      "terrain": 3,
+      "return": -242.53605719112798
+    },
+    {
+      "episode": 236,
+      "steps": 399,
+      "terrain": 2,
+      "return": -355.81098297382175
+    },
+    {
+      "episode": 237,
+      "steps": 399,
+      "terrain": 3,
+      "return": -317.2377653327505
+    },
+    {
+      "episode": 238,
+      "steps": 337,
+      "terrain": 3,
+      "return": -334.0270921458431
+    },
+    {
+      "episode": 239,
+      "steps": 399,
+      "terrain": 5,
+      "return": -320.5783459038975
+    },
+    {
+      "episode": 240,
+      "steps": 399,
+      "terrain": 5,
+      "return": -212.31246819735583
+    },
+    {
+      "episode": 241,
+      "steps": 331,
+      "terrain": 2,
+      "return": -271.9544363266943
+    },
+    {
+      "episode": 242,
+      "steps": 193,
+      "terrain": 3,
+      "return": -303.0619398745189
+    },
+    {
+      "episode": 243,
+      "steps": 59,
+      "terrain": 5,
+      "return": -187.1497982229173
+    },
+    {
+      "episode": 244,
+      "steps": 399,
+      "terrain": 5,
+      "return": -225.00993960472343
+    },
+    {
+      "episode": 245,
+      "steps": 399,
+      "terrain": 5,
+      "return": -240.88414649520743
+    },
+    {
+      "episode": 246,
+      "steps": 380,
+      "terrain": 3,
+      "return": -292.964110340389
+    },
+    {
+      "episode": 247,
+      "steps": 24,
+      "terrain": 7,
+      "return": -188.74237915290837
+    },
+    {
+      "episode": 248,
+      "steps": 399,
+      "terrain": 2,
+      "return": -334.51275423256936
+    },
+    {
+      "episode": 249,
+      "steps": 399,
+      "terrain": 3,
+      "return": -195.8029940765424
+    },
+    {
+      "episode": 250,
+      "steps": 399,
+      "terrain": 7,
+      "return": -187.44957972320805
+    },
+    {
+      "episode": 251,
+      "steps": 352,
+      "terrain": 4,
+      "return": -343.8632193018849
+    },
+    {
+      "episode": 252,
+      "steps": 385,
+      "terrain": 5,
+      "return": -333.9647037906785
+    },
+    {
+      "episode": 253,
+      "steps": 53,
+      "terrain": 2,
+      "return": -187.93878651208584
+    },
+    {
+      "episode": 254,
+      "steps": 399,
+      "terrain": 7,
+      "return": -246.37401127958762
+    },
+    {
+      "episode": 255,
+      "steps": 399,
+      "terrain": 4,
+      "return": -296.5318304559766
+    },
+    {
+      "episode": 256,
+      "steps": 399,
+      "terrain": 2,
+      "return": -170.44708778346248
+    },
+    {
+      "episode": 257,
+      "steps": 151,
+      "terrain": 3,
+      "return": -223.51667334697214
+    },
+    {
+      "episode": 258,
+      "steps": 246,
+      "terrain": 2,
+      "return": -338.67676988850405
+    },
+    {
+      "episode": 259,
+      "steps": 399,
+      "terrain": 7,
+      "return": -346.01931322016503
+    },
+    {
+      "episode": 260,
+      "steps": 399,
+      "terrain": 5,
+      "return": -328.57882934989544
+    },
+    {
+      "episode": 261,
+      "steps": 399,
+      "terrain": 2,
+      "return": -307.7199978272194
+    },
+    {
+      "episode": 262,
+      "steps": 154,
+      "terrain": 3,
+      "return": -208.25809605994766
+    },
+    {
+      "episode": 263,
+      "steps": 152,
+      "terrain": 5,
+      "return": -240.2175271258522
+    },
+    {
+      "episode": 264,
+      "steps": 399,
+      "terrain": 4,
+      "return": -288.43640592561314
+    },
+    {
+      "episode": 265,
+      "steps": 399,
+      "terrain": 3,
+      "return": -230.49677608333758
+    },
+    {
+      "episode": 266,
+      "steps": 204,
+      "terrain": 7,
+      "return": -225.54989986401745
+    },
+    {
+      "episode": 267,
+      "steps": 266,
+      "terrain": 2,
+      "return": -285.6959153041248
+    },
+    {
+      "episode": 268,
+      "steps": 356,
+      "terrain": 3,
+      "return": -316.06831434194794
+    },
+    {
+      "episode": 269,
+      "steps": 71,
+      "terrain": 5,
+      "return": -199.29603693939217
+    },
+    {
+      "episode": 270,
+      "steps": 399,
+      "terrain": 2,
+      "return": -210.29770799358596
+    },
+    {
+      "episode": 271,
+      "steps": 399,
+      "terrain": 5,
+      "return": -220.32061919676298
+    },
+    {
+      "episode": 272,
+      "steps": 399,
+      "terrain": 4,
+      "return": -262.9155983152106
+    },
+    {
+      "episode": 273,
+      "steps": 399,
+      "terrain": 4,
+      "return": -294.29693104929834
+    },
+    {
+      "episode": 274,
+      "steps": 331,
+      "terrain": 2,
+      "return": -252.13088178774524
+    },
+    {
+      "episode": 275,
+      "steps": 64,
+      "terrain": 7,
+      "return": -200.20200257362546
+    },
+    {
+      "episode": 276,
+      "steps": 399,
+      "terrain": 3,
+      "return": -252.4321587985533
+    },
+    {
+      "episode": 277,
+      "steps": 185,
+      "terrain": 4,
+      "return": -260.2096279028639
+    },
+    {
+      "episode": 278,
+      "steps": 399,
+      "terrain": 2,
+      "return": -155.59690049144444
+    },
+    {
+      "episode": 279,
+      "steps": 238,
+      "terrain": 2,
+      "return": -268.91207209109575
+    },
+    {
+      "episode": 280,
+      "steps": 69,
+      "terrain": 7,
+      "return": -205.69533935248285
+    },
+    {
+      "episode": 281,
+      "steps": 61,
+      "terrain": 2,
+      "return": -209.9514106876978
+    },
+    {
+      "episode": 282,
+      "steps": 399,
+      "terrain": 3,
+      "return": -197.2072342052161
+    },
+    {
+      "episode": 283,
+      "steps": 399,
+      "terrain": 4,
+      "return": -266.3151186619989
+    },
+    {
+      "episode": 284,
+      "steps": 399,
+      "terrain": 7,
+      "return": -280.27665243086017
+    },
+    {
+      "episode": 285,
+      "steps": 399,
+      "terrain": 3,
+      "return": -309.2657474322857
+    },
+    {
+      "episode": 286,
+      "steps": 399,
+      "terrain": 7,
+      "return": -311.11424077617994
+    },
+    {
+      "episode": 287,
+      "steps": 399,
+      "terrain": 5,
+      "return": -371.8003853724325
+    },
+    {
+      "episode": 288,
+      "steps": 105,
+      "terrain": 7,
+      "return": -223.94065283551055
+    },
+    {
+      "episode": 289,
+      "steps": 399,
+      "terrain": 3,
+      "return": -221.46290427259507
+    },
+    {
+      "episode": 290,
+      "steps": 69,
+      "terrain": 7,
+      "return": -207.9644677027667
+    },
+    {
+      "episode": 291,
+      "steps": 113,
+      "terrain": 4,
+      "return": -227.8183886768091
+    },
+    {
+      "episode": 292,
+      "steps": 399,
+      "terrain": 5,
+      "return": -344.7405960567784
+    },
+    {
+      "episode": 293,
+      "steps": 399,
+      "terrain": 4,
+      "return": -333.3999035567566
+    },
+    {
+      "episode": 294,
+      "steps": 399,
+      "terrain": 4,
+      "return": -307.6696762879046
+    },
+    {
+      "episode": 295,
+      "steps": 399,
+      "terrain": 4,
+      "return": -239.7944824336838
+    },
+    {
+      "episode": 296,
+      "steps": 399,
+      "terrain": 4,
+      "return": -235.74371460099124
+    },
+    {
+      "episode": 297,
+      "steps": 399,
+      "terrain": 4,
+      "return": -282.9231322416973
+    },
+    {
+      "episode": 298,
+      "steps": 192,
+      "terrain": 2,
+      "return": -218.40305161121017
+    },
+    {
+      "episode": 299,
+      "steps": 399,
+      "terrain": 5,
+      "return": -236.1652286653224
+    }
+  ]
+}
