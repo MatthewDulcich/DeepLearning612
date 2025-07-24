@@ -499,6 +499,8 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         
         # Compute log probabilities and entropy
         log_prob = dist.log_prob(actions)
+        if log_prob.dim() > 1:
+            log_prob = log_prob.sum(dim=-1)
         entropy = dist.entropy()
         
         return values, log_prob, entropy

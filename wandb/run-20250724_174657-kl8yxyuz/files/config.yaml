@@ -1,0 +1,174 @@
+_current_progress_remaining:
+    value: 1
+_custom_logger:
+    value: "True"
+_episode_num:
+    value: 0
+_last_episode_starts:
+    value: '[ True]'
+_last_obs:
+    value: |-
+        {'achieved_goal': array([[9.9998750e-03, 5.0883788e-18, 0.0000000e+00]], dtype=float32), 'desired_goal': array([[ 0.00999955, -0.00999875,  0.00999979]], dtype=float32), 'observation': array([[0.0000000e+00, 9.3394117e-03, 0.0000000e+00, 9.9998750e-03,
+                5.0883788e-18, 0.0000000e+00, 0.0000000e+00, 9.9999998e-03]],
+              dtype=float32)}
+_last_original_obs:
+    value: |-
+        {'achieved_goal': array([[2.0000000e+02, 5.0888877e-16, 0.0000000e+00]], dtype=float32), 'desired_goal': array([[105.7378  , -63.373306, 154.15598 ]], dtype=float32), 'observation': array([[0.0000000e+00, 2.6132205e+00, 0.0000000e+00, 2.0000000e+02,
+                5.0888877e-16, 0.0000000e+00, 0.0000000e+00, 5.0000000e+03]],
+              dtype=float32)}
+_logger:
+    value: <stable_baselines3.common.logger.Logger object at 0x7b2a745f0f10>
+_n_updates:
+    value: 0
+_num_timesteps_at_start:
+    value: 0
+_stats_window_size:
+    value: 100
+_total_timesteps:
+    value: 10000
+_vec_normalize_env:
+    value: <stable_baselines3.common.vec_env.vec_normalize.VecNormalize object at 0x7b2aa13c2f50>
+_wandb:
+    value:
+        cli_version: 0.21.0
+        e:
+            o2n3zqbsig3ejlrqraixvpf67azohvw2:
+                args:
+                    - --config
+                    - configs/baseline_lstm.yaml
+                    - --wandb
+                codePath: src/drone_rl/train/train.py
+                codePathLocal: src/drone_rl/train/train.py
+                cpu_count: 8
+                cpu_count_logical: 16
+                disk:
+                    /:
+                        total: "490577010688"
+                        used: "108907503616"
+                email: dulcichm@andrews.edu
+                executable: /home/mrdulcich/miniconda3/envs/drone-rl/bin/python
+                git:
+                    commit: 2c84a6a6046bc7e85093e443eb71645437e0ae30
+                    remote: https://github.com/MatthewDulcich/DeepLearning612.git
+                host: mrdulcich-SER
+                memory:
+                    total: "13513261056"
+                os: Linux-6.8.0-60-generic-x86_64-with-glibc2.35
+                program: /home/mrdulcich/Desktop/DeepLearning612/src/drone_rl/train/train.py
+                python: CPython 3.10.18
+                root: /home/mrdulcich/Desktop/DeepLearning612
+                startedAt: "2025-07-24T21:46:57.890744Z"
+                writerId: o2n3zqbsig3ejlrqraixvpf67azohvw2
+        m: []
+        python_version: 3.10.18
+        t:
+            "1":
+                - 1
+            "2":
+                - 1
+            "3":
+                - 2
+                - 13
+                - 16
+                - 22
+                - 61
+            "4": 3.10.18
+            "5": 0.21.0
+            "12": 0.21.0
+            "13": linux-x86_64
+action_noise:
+    value: None
+action_space:
+    value: Box([-180.   -4.    0.], [180.   9.   1.], (3,), float32)
+algo:
+    value: PPO
+batch_size:
+    value: 64
+clip_range:
+    value: <function get_schedule_fn.<locals>.<lambda> at 0x7b2a73c7a050>
+clip_range_vf:
+    value: None
+device:
+    value: cpu
+ent_coef:
+    value: 0.01
+env:
+    value: <stable_baselines3.common.vec_env.vec_normalize.VecNormalize object at 0x7b2aa13c2f50>
+env_id:
+    value: FlyCraft-v0
+ep_info_buffer:
+    value: deque([], maxlen=100)
+ep_success_buffer:
+    value: deque([], maxlen=100)
+eval_freq:
+    value: 1
+gae_lambda:
+    value: 0.95
+gamma:
+    value: 0.995
+learning_rate:
+    value: <function get_linear_fn.<locals>.func at 0x7b2a9b20a7a0>
+lr_schedule:
+    value: <function get_schedule_fn.<locals>.<lambda> at 0x7b2a9b20b7f0>
+max_grad_norm:
+    value: 0.5
+n_envs:
+    value: 1
+n_epochs:
+    value: 3
+n_steps:
+    value: 3
+normalize_advantage:
+    value: "True"
+num_timesteps:
+    value: 0
+observation_space:
+    value: 'Dict(''achieved_goal'': Box([   0.  -90. -180.], [1000.   90.  180.], (3,), float32), ''desired_goal'': Box([   0.  -90. -180.], [1000.   90.  180.], (3,), float32), ''observation'': Box([-180.  -90. -180.    0.  -90. -180. -300.    0.], [  180.    90.   180.  1000.    90.   180.   300. 20000.], (8,), float32))'
+output_dir:
+    value: runs
+policy:
+    value: lstm
+policy_class:
+    value: <class 'src.drone_rl.models.baselines.SimpleLSTMPolicy'>
+policy_kwargs:
+    value:
+        dropout: 0.1
+        lstm_hidden: 256
+        lstm_layers: 2
+ppo_kwargs:
+    value:
+        batch_size: 64
+        clip_range: 0.2
+        gae_lambda: 0.95
+        gamma: 0.995
+        learning_rate: 0.0003
+        n_epochs: 3
+        n_steps: 3
+rollout_buffer:
+    value: <stable_baselines3.common.buffers.DictRolloutBuffer object at 0x7b2a9b204580>
+rollout_buffer_class:
+    value: <class 'stable_baselines3.common.buffers.DictRolloutBuffer'>
+rollout_buffer_kwargs:
+    value: '{}'
+run_name:
+    value: baseline_lstm
+save_freq:
+    value: 1
+sde_sample_freq:
+    value: -1
+seed:
+    value: 11
+start_time:
+    value: 1753393623907938040
+target_kl:
+    value: None
+tensorboard_log:
+    value: runs/baseline_lstm/tb
+timesteps:
+    value: 10000
+use_sde:
+    value: "False"
+verbose:
+    value: 1
+vf_coef:
+    value: 1

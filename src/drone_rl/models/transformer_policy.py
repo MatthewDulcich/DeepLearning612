@@ -1,4 +1,3 @@
-
 """Transformer-based Actor-Critic policy for Stable-Baselines3.
 
 Defines:
@@ -409,13 +408,17 @@ class TransformerActorCritic(ActorCriticPolicy):
             logits = self.action_net(features)
             dist = self.action_dist.proba_distribution(action_logits=logits)
             actions = dist.get_actions(deterministic=deterministic)
-            log_prob = dist.log_prob(actions)
+            log_prob = dist.log_prob(actions)  # shape: (batch_size, action_dim)
+            if log_prob.dim() > 1:
+                log_prob = log_prob.sum(dim=-1)  # shape: (batch_size,)
         else:
             mean_actions = self.action_mean(features)
             log_std = self.action_log_std.expand_as(mean_actions)
             dist = self.action_dist.proba_distribution(mean_actions, log_std)
             actions = dist.get_actions(deterministic=deterministic)
-            log_prob = dist.log_prob(actions)
+            log_prob = dist.log_prob(actions)  # shape: (batch_size, action_dim)
+            if log_prob.dim() > 1:
+                log_prob = log_prob.sum(dim=-1)  # shape: (batch_size,)
 
         # rollout buffer expects shape (batch,)
         if log_prob.dim() > 1:
