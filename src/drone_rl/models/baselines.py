@@ -276,7 +276,7 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
     def __init__(
         self,
         observation_space: spaces.Dict,
-        features_dim: int = 128,
+        features_dim: int = 256,  # <-- match lstm_hidden
         lstm_hidden: int = 256,
         num_layers: int = 2,
         dropout: float = 0.1
@@ -306,7 +306,8 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
             else:
                 raise ValueError(f"Unsupported observation space: {space}")
         
-        # LSTM layers
+        self.lstm_hidden = lstm_hidden
+        self.num_layers = num_layers
         self.lstm = nn.LSTM(
             input_size=self.input_size,
             hidden_size=lstm_hidden,
@@ -314,67 +315,38 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
             batch_first=True,
             dropout=dropout if num_layers > 1 else 0
         )
-        
-        # Output projection
-        self.fc = nn.Sequential(
-            nn.Linear(lstm_hidden, features_dim),
-            nn.ReLU()
-        )
-        
-        # Hidden state for recurrent processing
-        self.hidden = None
     
-    def forward(self, observations: Dict[str, torch.Tensor]) -> torch.Tensor:
-        """Process observations through LSTM.
-        
-        Parameters
-        ----------
-        observations : Dict[str, torch.Tensor]
-            Dictionary of observation tensors
-            
-        Returns
-        -------
-        torch.Tensor
-            Extracted features
-        """
-        # Flatten and concatenate all observation components
-        features = []
-        for k in sorted(observations.keys()):
-            obs = observations[k]
-            if len(obs.shape) > 3:  # Handle image-like observations
-                b, seq, *spatial = obs.shape
-                obs = obs.reshape(b, seq, -1)
-            features.append(obs)
-        
-        x = torch.cat(features, dim=-1)  # [batch_size, seq_len, input_size]
-        
-        # Process through LSTM
-        if self.hidden is None or x.size(0) != self.hidden[0].size(1):
-            # Initialize hidden state if needed
-            self.reset_hidden(batch_size=x.size(0), device=x.device)
-        
-        lstm_out, self.hidden = self.lstm(x, self.hidden)
-        
-        # Use last timestep output
-        last_output = lstm_out[:, -1]
-        
-        # Project to output dimension
-        return self.fc(last_output)
-    
-    def reset_hidden(self, batch_size: int = 1, device: torch.device = torch.device("cpu")) -> None:
-        """Reset LSTM hidden state.
-        
-        Parameters
-        ----------
-        batch_size : int
-            Batch size for hidden state
-        device : torch.device
-            Device for hidden state tensors
-        """
-        # Initialize hidden state (h0, c0)
-        h0 = torch.zeros(self.lstm.num_layers, batch_size, self.lstm.hidden_size, device=device)
-        c0 = torch.zeros(self.lstm.num_layers, batch_size, self.lstm.hidden_size, device=device)
-        self.hidden = (h0, c0)
+    def forward(self, obs):
+        # Flatten and concatenate dict observation to tensor
+        if isinstance(obs, dict):
+            # Assume each value is a tensor of shape (batch_size, ...) or (...,)
+            obs_list = []
+            for k in sorted(obs.keys()):
+                v = obs[k]
+                if isinstance(v, np.ndarray):
+                    v = torch.from_numpy(v)
+                if not torch.is_tensor(v):
+                    v = torch.tensor(v)
+                # Flatten all but batch dimension
+                if v.dim() > 1:
+                    v = v.view(v.size(0), -1) if v.dim() == 2 else v.flatten()
+                obs_list.append(v)
+            x = torch.cat(obs_list, dim=-1)
+        else:
+            x = obs
+
+        # Now x is a tensor, continue as before
+        if x.dim() == 2:
+            x = x.unsqueeze(0)
+        elif x.dim() == 1:
+            x = x.unsqueeze(0).unsqueeze(0)
+        batch_size = x.size(0)
+        device = x.device
+        h_0 = torch.zeros(self.num_layers, batch_size, self.lstm_hidden, device=device)
+        c_0 = torch.zeros(self.num_layers, batch_size, self.lstm_hidden, device=device)
+        lstm_out, _ = self.lstm(x, (h_0, c_0))
+        features = lstm_out[:, -1, :]
+        return features
 
 
 class SimpleLSTMPolicy(ActorCriticPolicy):
