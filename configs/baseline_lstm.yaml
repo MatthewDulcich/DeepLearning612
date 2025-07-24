@@ -1,4 +1,4 @@
-env_id: FlyCraft-Nav-v0
+env_id: FlyCraft-v0
 run_name: baseline_lstm
 output_dir: runs
 seed: 11
