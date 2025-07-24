@@ -423,7 +423,7 @@ def main() -> None:
 
     # logger: wandb only
     if args.wandb and WANDB_AVAILABLE:
-        model.set_logger(configure(str(run_dir), ["wandb"]))
+        model.set_logger(configure(str(run_dir), ["stdout", "log", "csv"]))
     else:
         model.set_logger(configure(str(run_dir), []))
 
