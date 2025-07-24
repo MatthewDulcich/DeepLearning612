@@ -26,14 +26,14 @@ import io
 
 # Import local modules
 try:
-    import flycraft_gym  # noqa: F401
+    import flycraft  # noqa: F401
 except ImportError:
     st.error("FlyCraft gym not installed. Install with: pip install flycraft")
     st.stop()
 
-from drone_rl.models.transformer_policy import TransformerActorCritic
-from drone_rl.models.baselines import SimpleLSTMPolicy, DronePositionController
-from drone_rl.utils.metrics import time_to_collision, path_deviation, velocity_error
+from src.drone_rl.models.transformer_policy import TransformerActorCritic
+from src.drone_rl.models.baselines import SimpleLSTMPolicy, DronePositionController
+from src.drone_rl.utils.metrics import time_to_collision, path_deviation, velocity_error
 from stable_baselines3 import PPO
 
 # Page configuration
@@ -94,7 +94,7 @@ def load_model(model_path: str, model_type: str = "transformer"):
     """
     try:
         # Create environment
-        env = gym.make("FlyCraft-Nav-v0", render_mode="rgb_array", max_episode_steps=1000)
+        env = gym.make("FlyCraft", max_episode_steps=1000)
         
         # For PID controller, return a custom controller
         if model_type == "pid":
