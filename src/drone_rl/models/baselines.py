@@ -386,7 +386,9 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         kwargs["features_extractor_class"] = features_extractor_class
         kwargs["features_extractor_kwargs"] = features_extractor_kwargs
 
-        # Only pop LSTM-specific keys
+        # disables default mlp, so only features_extractor output is used
+        kwargs["net_arch"] = []
+
         kwargs.pop("lstm_hidden", None)
         kwargs.pop("num_layers", None)
         kwargs.pop("dropout", None)
