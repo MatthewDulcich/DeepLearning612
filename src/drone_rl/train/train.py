@@ -311,16 +311,6 @@ def main() -> None:
 
     device = args.device or ("cuda" if cuda_available() else "cpu")
 
-    # policy
-    policy_name = cfg.get("policy", "transformer")
-    if policy_name not in POLICIES:
-        raise ValueError(f"Unknown policy: {policy_name}. Available: {list(POLICIES.keys())}")
-    policy_cls = POLICIES[policy_name]
-    if policy_name == "transformer" and cfg.get("use_performer", False) and PERFORMER_AVAILABLE:
-        policy_cls = POLICIES["performer"]
-
-      # wider initial exploration  # for continuous actions, adjust if needed
-
     # --------- choose policy class ---------
     policy_name = cfg.get("policy", "transformer")
     if policy_name not in POLICIES:
@@ -329,24 +319,33 @@ def main() -> None:
     if policy_name == "transformer" and cfg.get("use_performer", False) and PERFORMER_AVAILABLE:
         policy_cls = POLICIES["performer"]
 
-    # --------- POLICY KWARGS ---------
-    policy_kwargs = cfg.get("policy_kwargs", {})
-    # wider initial exploration for continuous action spaces
-    if isinstance(train_env.action_space, gym.spaces.Box):
-        policy_kwargs["log_std_init"] = -0.3
+    policy_kwargs = cfg.get("policy_kwargs", {}).copy()
 
-    # clean feature-extractor kwargs
+    # Clean up feature extractor kwargs for both
     fx_kwargs = policy_kwargs.get("features_extractor_kwargs", {})
     fx_kwargs.pop("use_spatio_temporal", None)
     policy_kwargs["features_extractor_kwargs"] = fx_kwargs
-    policy_kwargs.setdefault("transformer_kwargs", {})
-    policy_kwargs["transformer_kwargs"].setdefault("attn_backend", "torch")
+
+    if policy_name == "transformer":
+        # Only set transformer-specific kwargs
+        policy_kwargs.setdefault("transformer_kwargs", {})
+        policy_kwargs["transformer_kwargs"].setdefault("attn_backend", "torch")
+        # Remove any LSTM-specific keys if present
+        policy_kwargs.pop("lstm_hidden", None)
+        policy_kwargs.pop("lstm_layers", None)
+    elif policy_name == "lstm":
+        # Remove transformer-specific keys if present
+        policy_kwargs.pop("transformer_kwargs", None)
+
+    # wider initial exploration for continuous action spaces
+    if isinstance(train_env.action_space, gym.spaces.Box):
+        policy_kwargs["log_std_init"] = -0.3
 
     # --------- PPO KWARGS ---------
     ppo_kwargs = cfg.get("ppo_kwargs", {})
     ppo_kwargs.setdefault("verbose", 1)
     ppo_kwargs.setdefault("device", device)
-    ppo_kwargs.setdefault("vf_coef", 1.0)        # prioritize critic a bit more
+    ppo_kwargs.setdefault("vf_coef", 1.0)
     ppo_kwargs.setdefault("ent_coef", 0.01)
     ppo_kwargs.setdefault("max_grad_norm", 0.5)
     ppo_kwargs.setdefault("n_epochs", 2)
@@ -355,7 +354,7 @@ def main() -> None:
     # schedules (override static if present)
     ppo_kwargs["learning_rate"] = get_linear_fn(1e-4, 5e-6, 1.0)
     ppo_kwargs["clip_range"]    = get_linear_fn(0.2, 0.1, 1.0)
-    ppo_kwargs["target_kl"]     = None  # use clip only, or set e.g. 0.02 if you want auto-early-stop
+    ppo_kwargs["target_kl"]     = None
 
     # --------- build model ---------
     model = PPO(
