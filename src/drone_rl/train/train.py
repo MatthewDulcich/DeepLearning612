@@ -460,22 +460,69 @@ def main() -> None:
 
     if args.wandb and WANDB_AVAILABLE:
         from src.drone_rl.train.wandb_logging_callback import WandbLoggingCallback
+        print("[INFO] Weights & Biases logging enabled. RL metrics will be sent to wandb.")
         callbacks.append(WandbCallback())
         callbacks.append(WandbLoggingCallback())
 
+    print(f"[INFO] Starting training for {timesteps} timesteps with policy: {policy_name}")
+    print(f"[INFO] Environment: {env_id} | n_envs: {n_envs} | Device: {device}")
+    print(f"[INFO] Run directory: {run_dir}")
+
     # train
     timesteps = cfg.get("timesteps", 1_000_000)
-    model.learn(total_timesteps=timesteps, callback=callbacks)
+    import traceback
+    import sys
+    def _print_progress(locals_, globals_):
+        # Print every 2,000 steps for more frequent feedback
+        try:
+            if locals_["self"].num_timesteps % 2000 == 0:
+                print(f"[PROGRESS] Step: {locals_['self'].num_timesteps}")
+                if hasattr(locals_["self"], "logger"):
+                    log_dict = getattr(locals_["self"].logger, "name_to_value", {})
+                    for k, v in log_dict.items():
+                        if isinstance(v, (int, float)):
+                            print(f"[METRIC] {k}: {v}")
+                # Save model checkpoint every 100,000 steps
+                if locals_["self"].num_timesteps % 100000 == 0:
+                    checkpoint_path = run_dir / "checkpoints" / f"checkpoint_{locals_['self'].num_timesteps}.zip"
+                    print(f"[CHECKPOINT] Saving model checkpoint: {checkpoint_path}")
+                    locals_["self"].save(str(checkpoint_path))
+        except Exception as e:
+            print(f"[ERROR] Exception in progress callback: {e}")
+            traceback.print_exc()
+        return True
 
-    # save
-    model.save(run_dir / cfg.get("save_name", "final_model"))
-    train_env.save(str(run_dir / "vecnormalize.pkl"))
-
-    train_env.close()
-    eval_env.close()
-    if args.wandb and WANDB_AVAILABLE:
-        wandb.finish()
-    print(f"Training complete. Model saved to {run_dir}")
+    try:
+        model.learn(total_timesteps=timesteps, callback=callbacks, callback_on_step=_print_progress)
+    except Exception as e:
+        print(f"[ERROR] Exception during training: {e}")
+        traceback.print_exc()
+        # Save a checkpoint on error
+        error_ckpt = run_dir / "checkpoints" / "checkpoint_error.zip"
+        print(f"[ERROR] Saving model checkpoint due to error: {error_ckpt}")
+        try:
+            model.save(str(error_ckpt))
+        except Exception as save_e:
+            print(f"[ERROR] Failed to save error checkpoint: {save_e}")
+        raise
+    finally:
+        # Always save final model and close envs
+        try:
+            model.save(run_dir / cfg.get("save_name", "final_model"))
+            train_env.save(str(run_dir / "vecnormalize.pkl"))
+        except Exception as final_save_e:
+            print(f"[ERROR] Failed to save final model or vecnormalize: {final_save_e}")
+        try:
+            train_env.close()
+            eval_env.close()
+        except Exception as close_e:
+            print(f"[ERROR] Failed to close environments: {close_e}")
+        if args.wandb and WANDB_AVAILABLE:
+            try:
+                wandb.finish()
+            except Exception as wandb_e:
+                print(f"[ERROR] wandb.finish() failed: {wandb_e}")
+        print(f"[INFO] Training complete. Model saved to {run_dir}")
 
 
 if __name__ == "__main__":
