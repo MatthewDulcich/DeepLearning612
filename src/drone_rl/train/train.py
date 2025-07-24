@@ -339,6 +339,10 @@ def main() -> None:
         # Map lstm_layers to num_layers if present
         if "lstm_layers" in policy_kwargs:
             policy_kwargs["num_layers"] = policy_kwargs.pop("lstm_layers")
+        # Remove any typo 'feature_dim' (should be 'features_dim')
+        if "feature_dim" in policy_kwargs:
+            v = policy_kwargs.pop("feature_dim")
+            print(f"[WARN] Removed unexpected LSTM policy_kwarg: feature_dim={v}")
         # Only keep allowed keys for SimpleLSTMPolicy
         allowed = {"lstm_hidden", "num_layers", "dropout", "log_std_init"}
         extra_keys = set(policy_kwargs.keys()) - allowed
