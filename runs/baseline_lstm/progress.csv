@@ -1,2 +1,2 @@
-model/extractor_type,time/total_timesteps,eval/mean_ep_length,eval/success_rate,model/parameters,eval/mean_reward
-"LSTMFeatureExtractor",1,287.6,0.0,806669,-265.4615173339844
+model/parameters,model/extractor_type,eval/mean_ep_length,time/total_timesteps,eval/success_rate,eval/mean_reward
+806669,"LSTMFeatureExtractor",287.6,1,0.0,-265.4615173339844

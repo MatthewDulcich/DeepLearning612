@@ -413,59 +413,35 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
             if module.bias is not None:
                 nn.init.zeros_(module.bias)
     
-    def forward(self, obs: Dict[str, torch.Tensor], deterministic: bool = False) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, obs: Dict[str, torch.Tensor], deterministic: bool = False) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Forward pass through policy.
-        
-        Parameters
-        ----------
-        obs : Dict[str, torch.Tensor]
-            Observation dictionary
-        deterministic : bool
-            Whether to sample deterministically
-            
-        Returns
-        -------
-        Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            Actions, values, and action parameters
-        """
+        Returns actions, values, action parameters, and log_prob (for SB3 buffer)."""
         features = self.extract_features(obs)
         
         # Get action distribution
         if isinstance(self.action_space, spaces.Discrete):
             logits = self.action_net(features)
             dist = self.action_dist.proba_distribution(action_logits=logits)
-            action_params = logits  # For discrete actions, logits are the params
+            action_params = logits
         else:  # Continuous actions
             mean_actions = self.action_mean(features)
-            # Use state-independent log std
             log_std = self.action_log_std.expand_as(mean_actions)
             dist = self.action_dist.proba_distribution(mean_actions, log_std)
-            action_params = mean_actions  # For continuous actions, means are the params
+            action_params = mean_actions
         
-        # Sample actions
         actions = dist.get_actions(deterministic=deterministic)
-        
-        # Compute values
         values = self.value_net(features).flatten()
         
-        return actions, values, action_params
+        # Compute log_prob for the sampled actions
+        log_prob = dist.log_prob(actions)
+        if log_prob.dim() > 1:
+            log_prob = log_prob.sum(dim=-1)
+        log_prob = log_prob.view(-1)
+        
+        return actions, values, action_params, log_prob
     
     def _predict(self, observation: Dict[str, torch.Tensor], deterministic: bool = False) -> torch.Tensor:
-        """Predict action given observation.
-        
-        Parameters
-        ----------
-        observation : Dict[str, torch.Tensor]
-            Observation dictionary
-        deterministic : bool
-            Whether to sample deterministically
-            
-        Returns
-        -------
-        torch.Tensor
-            Predicted actions
-        """
-        actions, _, _ = self.forward(observation, deterministic)
+        actions, _, _, _ = self.forward(observation, deterministic)
         return actions
     
     def evaluate_actions(self, obs: Dict[str, torch.Tensor], actions: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
