@@ -515,7 +515,7 @@ def main() -> None:
 
     try:
         # Use the custom _print_progress callback for frequent printing and checkpointing
-        model.learn(total_timesteps=timesteps, callback=callbacks, callback_on_step=_print_progress)
+        model.learn(total_timesteps=timesteps, callback=callbacks)
     except Exception as e:
         print(f"[ERROR] Exception during training: {e}")
         traceback.print_exc()
