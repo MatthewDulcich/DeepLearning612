@@ -334,8 +334,10 @@ def main() -> None:
         policy_kwargs.pop("lstm_hidden", None)
         policy_kwargs.pop("lstm_layers", None)
     elif policy_name == "lstm":
-        # Remove transformer-specific keys if present
         policy_kwargs.pop("transformer_kwargs", None)
+        if "lstm_layers" in policy_kwargs:
+            policy_kwargs["num_layers"] = policy_kwargs.pop("lstm_layers")
+        policy_kwargs.pop("features_dim", None)
 
     # wider initial exploration for continuous action spaces
     if isinstance(train_env.action_space, gym.spaces.Box):
@@ -464,12 +466,12 @@ def main() -> None:
         callbacks.append(WandbCallback())
         callbacks.append(WandbLoggingCallback())
 
+    timesteps = cfg.get("timesteps", 1_000_000)
+
     print(f"[INFO] Starting training for {timesteps} timesteps with policy: {policy_name}")
     print(f"[INFO] Environment: {env_id} | n_envs: {n_envs} | Device: {device}")
     print(f"[INFO] Run directory: {run_dir}")
 
-    # train
-    timesteps = cfg.get("timesteps", 1_000_000)
     import traceback
     import sys
     def _print_progress(locals_, globals_):

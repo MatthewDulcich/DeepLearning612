@@ -276,7 +276,6 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
     def __init__(
         self,
         observation_space: spaces.Dict,
-        features_dim: int = 256,  # <-- match lstm_hidden
         lstm_hidden: int = 256,
         num_layers: int = 2,
         dropout: float = 0.1
@@ -287,8 +286,6 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
         ----------
         observation_space : spaces.Dict
             Observation space (expects dictionary of arrays)
-        features_dim : int
-            Output feature dimension
         lstm_hidden : int
             Hidden size of LSTM layers
         num_layers : int
@@ -296,7 +293,7 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
         dropout : float
             Dropout probability between LSTM layers
         """
-        super().__init__(observation_space, features_dim=features_dim)
+        super().__init__(observation_space, features_dim=lstm_hidden)
         
         # Determine input size from observation space
         self.input_size = 0
@@ -358,11 +355,11 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
     
     def __init__(
         self, 
-        *args: Any, 
+        *args, 
         lstm_hidden: int = 256,
-        lstm_layers: int = 2,
+        num_layers: int = 2,
         dropout: float = 0.1,
-        **kwargs: Any
+        **kwargs
     ):
         """Initialize LSTM policy.
         
@@ -372,42 +369,29 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
             Arguments for parent class
         lstm_hidden : int
             Hidden size of LSTM
-        lstm_layers : int
+        num_layers : int
             Number of LSTM layers
         dropout : float
             Dropout probability
         **kwargs : Any
             Keyword arguments for parent class
         """
-        # Set custom feature extractor
-        features_kwargs = {
-            "features_dim": 128,
-            "lstm_hidden": lstm_hidden,
-            "num_layers": lstm_layers,
-            "dropout": dropout
-        }
-        kwargs.setdefault("features_extractor_class", LSTMFeatureExtractor)
-        kwargs.setdefault("features_extractor_kwargs", features_kwargs)
-        
-        super().__init__(*args, **kwargs)
-        
-        # Action network depends on action space type
-        if isinstance(self.action_space, spaces.Discrete):
-            self.action_net = nn.Linear(self.features_dim, self.action_space.n)
-        else:  # Continuous actions (Box)
-            action_dim = int(np.prod(self.action_space.shape))
-            self.action_mean = nn.Linear(self.features_dim, action_dim)
-            self.action_log_std = nn.Parameter(torch.zeros(action_dim))
-        
-        # Value network
-        self.value_net = nn.Sequential(
-            nn.Linear(self.features_dim, 128),
-            nn.ReLU(),
-            nn.Linear(128, 1)
+        # Remove LSTM-specific kwargs from kwargs before calling super()
+        features_extractor_class = LSTMFeatureExtractor
+        features_extractor_kwargs = dict(
+            lstm_hidden=lstm_hidden,
+            num_layers=num_layers,
+            dropout=dropout,
         )
-        
-        # Initialize weights
-        self.apply(self._weights_init)
+        kwargs["features_extractor_class"] = features_extractor_class
+        kwargs["features_extractor_kwargs"] = features_extractor_kwargs
+
+        # Remove LSTM-specific keys if present
+        kwargs.pop("lstm_hidden", None)
+        kwargs.pop("num_layers", None)
+        kwargs.pop("dropout", None)
+
+        super().__init__(*args, **kwargs)
     
     @staticmethod
     def _weights_init(module: nn.Module) -> None:
