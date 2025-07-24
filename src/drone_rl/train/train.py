@@ -459,7 +459,9 @@ def main() -> None:
         )
 
     if args.wandb and WANDB_AVAILABLE:
+        from src.drone_rl.train.wandb_logging_callback import WandbLoggingCallback
         callbacks.append(WandbCallback())
+        callbacks.append(WandbLoggingCallback())
 
     # train
     timesteps = cfg.get("timesteps", 1_000_000)
