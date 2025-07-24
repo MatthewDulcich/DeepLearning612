@@ -321,23 +321,33 @@ def main() -> None:
 
     policy_kwargs = cfg.get("policy_kwargs", {}).copy()
 
-    # Clean up feature extractor kwargs for both
-    fx_kwargs = policy_kwargs.get("features_extractor_kwargs", {})
-    fx_kwargs.pop("use_spatio_temporal", None)
-    policy_kwargs["features_extractor_kwargs"] = fx_kwargs
-
     if policy_name == "transformer":
         # Only set transformer-specific kwargs
+        fx_kwargs = policy_kwargs.get("features_extractor_kwargs", {})
+        fx_kwargs.pop("use_spatio_temporal", None)
+        policy_kwargs["features_extractor_kwargs"] = fx_kwargs
         policy_kwargs.setdefault("transformer_kwargs", {})
         policy_kwargs["transformer_kwargs"].setdefault("attn_backend", "torch")
         # Remove any LSTM-specific keys if present
         policy_kwargs.pop("lstm_hidden", None)
         policy_kwargs.pop("lstm_layers", None)
     elif policy_name == "lstm":
+        # Remove transformer and feature extractor keys that could break LSTM
         policy_kwargs.pop("transformer_kwargs", None)
+        policy_kwargs.pop("features_extractor_kwargs", None)
+        policy_kwargs.pop("features_dim", None)
+        # Map lstm_layers to num_layers if present
         if "lstm_layers" in policy_kwargs:
             policy_kwargs["num_layers"] = policy_kwargs.pop("lstm_layers")
-        policy_kwargs.pop("features_dim", None)
+        # Only keep allowed keys for SimpleLSTMPolicy
+        allowed = {"lstm_hidden", "num_layers", "dropout", "log_std_init"}
+        extra_keys = set(policy_kwargs.keys()) - allowed
+        for k in extra_keys:
+            v = policy_kwargs.pop(k)
+            print(f"[WARN] Removed unexpected LSTM policy_kwarg: {k}={v}")
+        # If dropout not set, set default
+        if "dropout" not in policy_kwargs:
+            policy_kwargs["dropout"] = 0.1
 
     # wider initial exploration for continuous action spaces
     if isinstance(train_env.action_space, gym.spaces.Box):
@@ -495,7 +505,8 @@ def main() -> None:
         return True
 
     try:
-        model.learn(total_timesteps=timesteps, callback=callbacks)
+        # Use the custom _print_progress callback for frequent printing and checkpointing
+        model.learn(total_timesteps=timesteps, callback=callbacks, callback_on_step=_print_progress)
     except Exception as e:
         print(f"[ERROR] Exception during training: {e}")
         traceback.print_exc()
