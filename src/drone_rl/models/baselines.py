@@ -386,13 +386,13 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         kwargs["features_extractor_class"] = features_extractor_class
         kwargs["features_extractor_kwargs"] = features_extractor_kwargs
 
+        # Only pop LSTM-specific keys
         kwargs.pop("lstm_hidden", None)
         kwargs.pop("num_layers", None)
         kwargs.pop("dropout", None)
 
         super().__init__(*args, **kwargs)
 
-        # --- FIX: Explicitly define action_mean for continuous action spaces ---
         if isinstance(self.action_space, spaces.Box):
             self.action_mean = nn.Linear(self.features_dim, self.action_space.shape[0])
             self.action_log_std = nn.Parameter(torch.zeros(self.action_space.shape[0]))
