@@ -499,9 +499,14 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         
         # Compute log probabilities and entropy
         log_prob = dist.log_prob(actions)
+        # Always sum last dimension for continuous actions to get shape (batch,)
         if log_prob.dim() > 1:
             log_prob = log_prob.sum(dim=-1)
+        log_prob = log_prob.view(-1)  # Ensure shape (batch,)
         entropy = dist.entropy()
+        if entropy.dim() > 1:
+            entropy = entropy.sum(dim=-1)
+        entropy = entropy.view(-1)
         
         return values, log_prob, entropy
     
