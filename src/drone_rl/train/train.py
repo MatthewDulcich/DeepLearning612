@@ -20,9 +20,9 @@ from stable_baselines3.common.utils import get_linear_fn, set_random_seed
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor, VecNormalize
 
 # Local
-from drone_rl.models.transformer_policy import TransformerActorCritic
-from drone_rl.models.baselines import SimpleLSTMPolicy, DronePositionController  # optional
-from drone_rl.utils.metrics import count_parameters, estimate_flops
+from src.drone_rl.models.transformer_policy import TransformerActorCritic
+from src.drone_rl.models.baselines import SimpleLSTMPolicy, DronePositionController  # optional
+from src.drone_rl.utils.metrics import count_parameters, estimate_flops
 
 # wandb optional
 try:
