@@ -438,10 +438,10 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
             log_prob = log_prob.sum(dim=-1)
         log_prob = log_prob.view(-1)
         
-        return actions, values, action_params, log_prob
+        return actions, values, log_prob
     
     def _predict(self, observation: Dict[str, torch.Tensor], deterministic: bool = False) -> torch.Tensor:
-        actions, _, _, _ = self.forward(observation, deterministic)
+        actions, _, _ = self.forward(observation, deterministic)
         return actions
     
     def evaluate_actions(self, obs: Dict[str, torch.Tensor], actions: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:

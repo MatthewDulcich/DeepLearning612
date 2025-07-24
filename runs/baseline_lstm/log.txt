@@ -1,12 +1,1 @@
 Logging to runs/baseline_lstm
----------------------------------------------
-| eval/              |                      |
-|    mean_ep_length  | 288                  |
-|    mean_reward     | -265                 |
-|    success_rate    | 0                    |
-| model/             |                      |
-|    extractor_type  | LSTMFeatureExtractor |
-|    parameters      | 806669               |
-| time/              |                      |
-|    total_timesteps | 1                    |
----------------------------------------------
