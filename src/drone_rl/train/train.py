@@ -373,6 +373,11 @@ def main() -> None:
     ppo_kwargs["target_kl"]     = None
 
     # --------- build model ---------
+    # Final pop to guarantee no features_dim is present
+    if policy_name == "lstm" and "features_dim" in policy_kwargs:
+        v = policy_kwargs.pop("features_dim")
+        print(f"[WARN] Removed lingering features_dim before model creation: {v}")
+    print(f"[DEBUG] Final policy_kwargs for {policy_name}: {policy_kwargs}")
     model = PPO(
         policy=policy_cls,
         env=train_env,
