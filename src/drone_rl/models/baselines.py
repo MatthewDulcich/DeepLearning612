@@ -376,7 +376,7 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         **kwargs : Any
             Keyword arguments for parent class
         """
-        # Remove LSTM-specific kwargs from kwargs before calling super()
+        # Prepare feature extractor
         features_extractor_class = LSTMFeatureExtractor
         features_extractor_kwargs = dict(
             lstm_hidden=lstm_hidden,
@@ -386,12 +386,20 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         kwargs["features_extractor_class"] = features_extractor_class
         kwargs["features_extractor_kwargs"] = features_extractor_kwargs
 
-        # Remove LSTM-specific keys if present
+        # Only remove LSTM-specific keys if present
         kwargs.pop("lstm_hidden", None)
         kwargs.pop("num_layers", None)
         kwargs.pop("dropout", None)
 
+        # DO NOT pop features_dim, action_space, observation_space, etc. from kwargs!
+        # These are required by ActorCriticPolicy to build action_mean and other layers
+
         super().__init__(*args, **kwargs)
+
+        # --- FIX: Explicitly define action_mean for continuous action spaces ---
+        if isinstance(self.action_space, spaces.Box):
+            self.action_mean = nn.Linear(self.features_dim, self.action_space.shape[0])
+            self.action_log_std = nn.Parameter(torch.zeros(self.action_space.shape[0]))
     
     @staticmethod
     def _weights_init(module: nn.Module) -> None:
