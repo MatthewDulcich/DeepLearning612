@@ -495,7 +495,7 @@ def main() -> None:
         return True
 
     try:
-        model.learn(total_timesteps=timesteps, callback=callbacks, callback_on_step=_print_progress)
+        model.learn(total_timesteps=timesteps, callback=callbacks)
     except Exception as e:
         print(f"[ERROR] Exception during training: {e}")
         traceback.print_exc()
