@@ -1,0 +1,77 @@
+_wandb:
+    value:
+        cli_version: 0.21.0
+        e:
+            lw4tked47otc8pr19brluarqn22ygizl:
+                args:
+                    - --config
+                    - configs/baseline_lstm.yaml
+                    - --wandb
+                codePath: src/drone_rl/train/train.py
+                codePathLocal: src/drone_rl/train/train.py
+                cpu_count: 8
+                cpu_count_logical: 16
+                disk:
+                    /:
+                        total: "490577010688"
+                        used: "108877168640"
+                email: dulcichm@andrews.edu
+                executable: /home/mrdulcich/miniconda3/envs/drone-rl/bin/python
+                git:
+                    commit: 7cae74c5fdd50e65f06b295ad7de2c4b58742504
+                    remote: https://github.com/MatthewDulcich/DeepLearning612.git
+                host: mrdulcich-SER
+                memory:
+                    total: "13513261056"
+                os: Linux-6.8.0-60-generic-x86_64-with-glibc2.35
+                program: /home/mrdulcich/Desktop/DeepLearning612/src/drone_rl/train/train.py
+                python: CPython 3.10.18
+                root: /home/mrdulcich/Desktop/DeepLearning612
+                startedAt: "2025-07-24T20:42:21.763212Z"
+                writerId: lw4tked47otc8pr19brluarqn22ygizl
+        m: []
+        python_version: 3.10.18
+        t:
+            "1":
+                - 1
+            "2":
+                - 1
+            "3":
+                - 13
+                - 16
+                - 35
+            "4": 3.10.18
+            "5": 0.21.0
+            "12": 0.21.0
+            "13": linux-x86_64
+env_id:
+    value: FlyCraft-v0
+eval_freq:
+    value: 100
+n_envs:
+    value: 8
+output_dir:
+    value: runs
+policy:
+    value: lstm
+policy_kwargs:
+    value:
+        lstm_hidden: 256
+        lstm_layers: 2
+ppo_kwargs:
+    value:
+        batch_size: 512
+        clip_range: 0.2
+        gae_lambda: 0.95
+        gamma: 0.995
+        learning_rate: 0.0003
+        n_epochs: 3
+        n_steps: 256
+run_name:
+    value: baseline_lstm
+save_freq:
+    value: 200
+seed:
+    value: 11
+timesteps:
+    value: 10000

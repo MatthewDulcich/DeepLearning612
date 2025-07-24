@@ -385,7 +385,6 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         )
         kwargs["features_extractor_class"] = features_extractor_class
         kwargs["features_extractor_kwargs"] = features_extractor_kwargs
-        kwargs["features_dim"] = lstm_hidden  # <-- Ensure this is set
 
         kwargs.pop("lstm_hidden", None)
         kwargs.pop("num_layers", None)
