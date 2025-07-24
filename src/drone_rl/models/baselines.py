@@ -385,14 +385,11 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         )
         kwargs["features_extractor_class"] = features_extractor_class
         kwargs["features_extractor_kwargs"] = features_extractor_kwargs
+        kwargs["features_dim"] = lstm_hidden  # <-- Ensure this is set
 
-        # Only remove LSTM-specific keys if present
         kwargs.pop("lstm_hidden", None)
         kwargs.pop("num_layers", None)
         kwargs.pop("dropout", None)
-
-        # DO NOT pop features_dim, action_space, observation_space, etc. from kwargs!
-        # These are required by ActorCriticPolicy to build action_mean and other layers
 
         super().__init__(*args, **kwargs)
 

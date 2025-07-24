@@ -1,0 +1,229 @@
+_current_progress_remaining:
+    value: 1
+_custom_logger:
+    value: "True"
+_episode_num:
+    value: 0
+_last_episode_starts:
+    value: '[ True  True  True  True  True  True  True  True]'
+_last_obs:
+    value: |-
+        {'achieved_goal': array([[3.5354898e-03, 1.7984629e-18, 0.0000000e+00],
+               [3.5354898e-03, 1.7984629e-18, 0.0000000e+00],
+               [3.5354898e-03, 1.7984629e-18, 0.0000000e+00],
+               [3.5354898e-03, 1.7984629e-18, 0.0000000e+00],
+               [3.5354898e-03, 1.7984629e-18, 0.0000000e+00],
+               [3.5354898e-03, 1.7984629e-18, 0.0000000e+00],
+               [3.5354898e-03, 1.7984629e-18, 0.0000000e+00],
+               [3.5354898e-03, 1.7984629e-18, 0.0000000e+00]], dtype=float32), 'desired_goal': array([[-0.9563854 , -1.060076  ,  1.4249396 ],
+               [-0.36355522, -0.34960347, -0.75133646],
+               [-0.04016086, -1.3088803 ,  1.4818826 ],
+               [ 2.3164487 ,  0.6755922 ,  0.24006139],
+               [-0.8928158 ,  0.43032813, -1.0142846 ],
+               [ 0.30086124,  0.6059094 , -1.4029257 ],
+               [ 0.3795906 , -0.8243254 , -0.26695517],
+               [-0.74367875,  1.8310376 ,  0.2886095 ]], dtype=float32), 'observation': array([[0.0000000e+00, 3.3018517e-03, 0.0000000e+00, 3.5354898e-03,
+                1.7984629e-18, 0.0000000e+00, 0.0000000e+00, 3.5355338e-03],
+               [0.0000000e+00, 3.3018517e-03, 0.0000000e+00, 3.5354898e-03,
+                1.7984629e-18, 0.0000000e+00, 0.0000000e+00, 3.5355338e-03],
+               [0.0000000e+00, 3.3018517e-03, 0.0000000e+00, 3.5354898e-03,
+                1.7984629e-18, 0.0000000e+00, 0.0000000e+00, 3.5355338e-03],
+               [0.0000000e+00, 3.3018517e-03, 0.0000000e+00, 3.5354898e-03,
+                1.7984629e-18, 0.0000000e+00, 0.0000000e+00, 3.5355338e-03],
+               [0.0000000e+00, 3.3018517e-03, 0.0000000e+00, 3.5354898e-03,
+                1.7984629e-18, 0.0000000e+00, 0.0000000e+00, 3.5355338e-03],
+               [0.0000000e+00, 3.3018517e-03, 0.0000000e+00, 3.5354898e-03,
+                1.7984629e-18, 0.0000000e+00, 0.0000000e+00, 3.5355338e-03],
+               [0.0000000e+00, 3.3018517e-03, 0.0000000e+00, 3.5354898e-03,
+                1.7984629e-18, 0.0000000e+00, 0.0000000e+00, 3.5355338e-03],
+               [0.0000000e+00, 3.3018517e-03, 0.0000000e+00, 3.5354898e-03,
+                1.7984629e-18, 0.0000000e+00, 0.0000000e+00, 3.5355338e-03]],
+              dtype=float32)}
+_last_original_obs:
+    value: |-
+        {'achieved_goal': array([[2.0000000e+02, 5.0888877e-16, 0.0000000e+00],
+               [2.0000000e+02, 5.0888877e-16, 0.0000000e+00],
+               [2.0000000e+02, 5.0888877e-16, 0.0000000e+00],
+               [2.0000000e+02, 5.0888877e-16, 0.0000000e+00],
+               [2.0000000e+02, 5.0888877e-16, 0.0000000e+00],
+               [2.0000000e+02, 5.0888877e-16, 0.0000000e+00],
+               [2.0000000e+02, 5.0888877e-16, 0.0000000e+00],
+               [2.0000000e+02, 5.0888877e-16, 0.0000000e+00]], dtype=float32), 'desired_goal': array([[ 105.7378   ,  -63.373306 ,  154.15598  ],
+               [ 135.85828  ,  -27.019938 ,  -97.00515  ],
+               [ 152.28928  ,  -76.104095 ,  160.72768  ],
+               [ 272.02374  ,   25.437147 ,   17.410755 ],
+               [ 108.967636 ,   12.8875065, -127.35165  ],
+               [ 169.6159   ,   21.871628 , -172.2042   ],
+               [ 173.61598  ,  -51.310448 ,  -41.103348 ],
+               [ 116.54498  ,   84.55884  ,   23.013628 ]], dtype=float32), 'observation': array([[0.0000000e+00, 2.6132205e+00, 0.0000000e+00, 2.0000000e+02,
+                5.0888877e-16, 0.0000000e+00, 0.0000000e+00, 5.0000000e+03],
+               [0.0000000e+00, 2.6132205e+00, 0.0000000e+00, 2.0000000e+02,
+                5.0888877e-16, 0.0000000e+00, 0.0000000e+00, 5.0000000e+03],
+               [0.0000000e+00, 2.6132205e+00, 0.0000000e+00, 2.0000000e+02,
+                5.0888877e-16, 0.0000000e+00, 0.0000000e+00, 5.0000000e+03],
+               [0.0000000e+00, 2.6132205e+00, 0.0000000e+00, 2.0000000e+02,
+                5.0888877e-16, 0.0000000e+00, 0.0000000e+00, 5.0000000e+03],
+               [0.0000000e+00, 2.6132205e+00, 0.0000000e+00, 2.0000000e+02,
+                5.0888877e-16, 0.0000000e+00, 0.0000000e+00, 5.0000000e+03],
+               [0.0000000e+00, 2.6132205e+00, 0.0000000e+00, 2.0000000e+02,
+                5.0888877e-16, 0.0000000e+00, 0.0000000e+00, 5.0000000e+03],
+               [0.0000000e+00, 2.6132205e+00, 0.0000000e+00, 2.0000000e+02,
+                5.0888877e-16, 0.0000000e+00, 0.0000000e+00, 5.0000000e+03],
+               [0.0000000e+00, 2.6132205e+00, 0.0000000e+00, 2.0000000e+02,
+                5.0888877e-16, 0.0000000e+00, 0.0000000e+00, 5.0000000e+03]],
+              dtype=float32)}
+_logger:
+    value: <stable_baselines3.common.logger.Logger object at 0x7b459dd6e9e0>
+_n_updates:
+    value: 0
+_num_timesteps_at_start:
+    value: 0
+_stats_window_size:
+    value: 100
+_total_timesteps:
+    value: 10000
+_vec_normalize_env:
+    value: <stable_baselines3.common.vec_env.vec_normalize.VecNormalize object at 0x7b45b5ab9330>
+_wandb:
+    value:
+        cli_version: 0.21.0
+        e:
+            jpv0avjsd7b6t0zw08rtxxjrj48pom1p:
+                args:
+                    - --config
+                    - configs/baseline_lstm.yaml
+                    - --wandb
+                codePath: src/drone_rl/train/train.py
+                codePathLocal: src/drone_rl/train/train.py
+                cpu_count: 8
+                cpu_count_logical: 16
+                disk:
+                    /:
+                        total: "490577010688"
+                        used: "108872531968"
+                email: dulcichm@andrews.edu
+                executable: /home/mrdulcich/miniconda3/envs/drone-rl/bin/python
+                git:
+                    commit: 33e9b1d7921a06cf2fa084cec99afa2e55e22673
+                    remote: https://github.com/MatthewDulcich/DeepLearning612.git
+                host: mrdulcich-SER
+                memory:
+                    total: "13513261056"
+                os: Linux-6.8.0-60-generic-x86_64-with-glibc2.35
+                program: /home/mrdulcich/Desktop/DeepLearning612/src/drone_rl/train/train.py
+                python: CPython 3.10.18
+                root: /home/mrdulcich/Desktop/DeepLearning612
+                startedAt: "2025-07-24T20:04:47.711970Z"
+                writerId: jpv0avjsd7b6t0zw08rtxxjrj48pom1p
+        m: []
+        python_version: 3.10.18
+        t:
+            "1":
+                - 1
+            "2":
+                - 1
+            "3":
+                - 2
+                - 13
+                - 16
+                - 22
+                - 35
+            "4": 3.10.18
+            "5": 0.21.0
+            "12": 0.21.0
+            "13": linux-x86_64
+action_noise:
+    value: None
+action_space:
+    value: Box([-180.   -4.    0.], [180.   9.   1.], (3,), float32)
+algo:
+    value: PPO
+batch_size:
+    value: 512
+clip_range:
+    value: <function get_schedule_fn.<locals>.<lambda> at 0x7b459d421bd0>
+clip_range_vf:
+    value: None
+device:
+    value: cpu
+ent_coef:
+    value: 0.01
+env:
+    value: <stable_baselines3.common.vec_env.vec_normalize.VecNormalize object at 0x7b45b5ab9330>
+env_id:
+    value: FlyCraft-v0
+ep_info_buffer:
+    value: deque([], maxlen=100)
+ep_success_buffer:
+    value: deque([], maxlen=100)
+eval_freq:
+    value: 100
+gae_lambda:
+    value: 0.95
+gamma:
+    value: 0.995
+learning_rate:
+    value: <function get_linear_fn.<locals>.func at 0x7b45b5af2e60>
+lr_schedule:
+    value: <function get_schedule_fn.<locals>.<lambda> at 0x7b45b5af2f80>
+max_grad_norm:
+    value: 0.5
+n_envs:
+    value: 8
+n_epochs:
+    value: 3
+n_steps:
+    value: 256
+normalize_advantage:
+    value: "True"
+num_timesteps:
+    value: 0
+observation_space:
+    value: 'Dict(''achieved_goal'': Box([   0.  -90. -180.], [1000.   90.  180.], (3,), float32), ''desired_goal'': Box([   0.  -90. -180.], [1000.   90.  180.], (3,), float32), ''observation'': Box([-180.  -90. -180.    0.  -90. -180. -300.    0.], [  180.    90.   180.  1000.    90.   180.   300. 20000.], (8,), float32))'
+output_dir:
+    value: runs
+policy:
+    value: lstm
+policy_class:
+    value: <class 'src.drone_rl.models.baselines.SimpleLSTMPolicy'>
+policy_kwargs:
+    value:
+        lstm_hidden: 256
+        lstm_layers: 2
+ppo_kwargs:
+    value:
+        batch_size: 512
+        clip_range: 0.2
+        gae_lambda: 0.95
+        gamma: 0.995
+        learning_rate: 0.0003
+        n_epochs: 3
+        n_steps: 256
+rollout_buffer:
+    value: <stable_baselines3.common.buffers.DictRolloutBuffer object at 0x7b45b5109480>
+rollout_buffer_class:
+    value: <class 'stable_baselines3.common.buffers.DictRolloutBuffer'>
+rollout_buffer_kwargs:
+    value: '{}'
+run_name:
+    value: baseline_lstm
+save_freq:
+    value: 200
+sde_sample_freq:
+    value: -1
+seed:
+    value: 11
+start_time:
+    value: 1753387494371327239
+target_kl:
+    value: None
+tensorboard_log:
+    value: runs/baseline_lstm/tb
+timesteps:
+    value: 10000
+use_sde:
+    value: "False"
+verbose:
+    value: 1
+vf_coef:
+    value: 1
