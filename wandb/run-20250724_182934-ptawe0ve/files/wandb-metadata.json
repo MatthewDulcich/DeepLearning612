@@ -1,0 +1,33 @@
+{
+  "os":  "Linux-6.8.0-60-generic-x86_64-with-glibc2.35",
+  "python":  "CPython 3.10.18",
+  "startedAt":  "2025-07-24T22:29:34.144834Z",
+  "args":  [
+    "--config",
+    "configs/baseline_lstm.yaml",
+    "--wandb"
+  ],
+  "program":  "/home/mrdulcich/Desktop/DeepLearning612/src/drone_rl/train/train.py",
+  "codePath":  "src/drone_rl/train/train.py",
+  "codePathLocal":  "src/drone_rl/train/train.py",
+  "git":  {
+    "remote":  "https://github.com/MatthewDulcich/DeepLearning612.git",
+    "commit":  "0963d65a17a18fab58ce0c4c231dc6339c2a2b3d"
+  },
+  "email":  "dulcichm@andrews.edu",
+  "root":  "/home/mrdulcich/Desktop/DeepLearning612",
+  "host":  "mrdulcich-SER",
+  "executable":  "/home/mrdulcich/miniconda3/envs/drone-rl/bin/python",
+  "cpu_count":  8,
+  "cpu_count_logical":  16,
+  "disk":  {
+    "/":  {
+      "total":  "490577010688",
+      "used":  "108934217728"
+    }
+  },
+  "memory":  {
+    "total":  "13513261056"
+  },
+  "writerId":  "badp4389ylwcy4q9fuzvmqgh2s4k0axj"
+}
