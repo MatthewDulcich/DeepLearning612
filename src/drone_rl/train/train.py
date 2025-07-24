@@ -40,14 +40,14 @@ except ImportError:
 
 # Optional other policies
 try:
-    from drone_rl.models.performer import PerformerActorCritic
+    from src.drone_rl.models.performer import PerformerActorCritic
     PERFORMER_AVAILABLE = True
 except Exception:
     PERFORMER_AVAILABLE = False
     PerformerActorCritic = None  # type: ignore
 
 try:
-    from drone_rl.models.perceiver import PerceiverActorCritic
+    from src.drone_rl.models.perceiver import PerceiverActorCritic
     PERCEIVER_AVAILABLE = True
 except Exception:
     PERCEIVER_AVAILABLE = False
@@ -281,8 +281,8 @@ def main() -> None:
             project=cfg.get("wandb_project", "drone-transformer-rl"),
             name=run_name,
             config=cfg,
-            sync_tensorboard=True,
-            monitor_gym=True,
+            sync_tensorboard=False,
+            monitor_gym=False,
         )
 
     # Vec envs + VecNormalize
@@ -421,8 +421,11 @@ def main() -> None:
         model.policy.state_predictor = seq_predictor
         model.policy.predict_next_states = predict_next_states  # type: ignore
 
-    # logger
-    model.set_logger(configure(str(run_dir), ["stdout", "csv", "tensorboard"]))
+    # logger: wandb only
+    if args.wandb and WANDB_AVAILABLE:
+        model.set_logger(configure(str(run_dir), ["wandb"]))
+    else:
+        model.set_logger(configure(str(run_dir), []))
 
     # KD
     if args.teacher:
@@ -481,9 +484,11 @@ def main() -> None:
 
     if args.wandb and WANDB_AVAILABLE:
         from src.drone_rl.train.wandb_logging_callback import WandbLoggingCallback
+        from src.drone_rl.train.wandb_step_logging_callback import WandbStepLoggingCallback
         print("[INFO] Weights & Biases logging enabled. RL metrics will be sent to wandb.")
         callbacks.append(WandbCallback())
         callbacks.append(WandbLoggingCallback())
+        callbacks.append(WandbStepLoggingCallback(log_freq=5))
 
     timesteps = cfg.get("timesteps", 1_000_000)
 
