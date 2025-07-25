@@ -1,0 +1,6 @@
+eval/mean_reward,model/parameters,model/extractor_type,time/total_timesteps,eval/success_rate,eval/mean_ep_length,rollout/success_rate,rollout/ep_len_mean,time/iterations,eval/seq_prediction_mse,eval/best_seq_prediction_mse,rollout/ep_rew_mean,time/time_elapsed,time/fps,train/approx_kl,train/explained_variance,train/clip_range,train/loss,train/policy_gradient_loss,train/value_loss,train/std,train/n_updates,train/clip_range_vf,train/learning_rate,train/entropy_loss,train/clip_fraction
+-247.75228881835938,5865051,"TransformerFeaturesExtractor",20000,0.0,204.3,,,,,,,,,,,,,,,,,,,,
+,,,32768,,,0.0,237.16,1,1.1128253519535065,1.1128253519535065,-262.5487365722656,39,825,,,,,,,,,,,,
+-261.5914001464844,,,40000,0.0,224.1,,,,,,,,,0.86712307,0.15742117166519165,0.19934464000000002,0.37339070439338684,0.15099576325155795,0.7354796510189772,0.740818202495575,4,0.2,9.9377408e-05,-4.256815433502197,0.8651351928710938
+-226.4181671142578,,,60000,0.0,154.7,,,,0.9924488246440888,0.9924488246440888,,,,,,,,,,,,,,,
+,,,65536,,,0.01,246.17,2,1.025433737039566,,-268.2196044921875,107,610,,,,,,,,,,,,

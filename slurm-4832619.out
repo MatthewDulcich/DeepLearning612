@@ -1,0 +1,102 @@
+Job started on cml31.umiacs.umd.edu at Wed Jul 23 00:14:29 EDT 2025
+Loading gcc/15.1.0
+  Loading requirement: gmp/6.3.0 mpfr/4.2.1 mpc/1.3.1 ppl/1.2 cloog/0.18.4
+    dejagnu/1.6.3 autogen/5.18.7 isl/0.27
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+wandb: Currently logged in as: advaitgupta (techpeek) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.21.0
+wandb: Run data is saved locally in /cmlscratch/advait25/drone_transformer_rl/wandb/run-20250723_001436-tiri6c6i
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run teacher_large_v5
+wandb: ⭐️ View project at https://wandb.ai/techpeek/drone-transformer-rl
+wandb: 🚀 View run at https://wandb.ai/techpeek/drone-transformer-rl/runs/tiri6c6i
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/cmlscratch/advait25/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+Using cuda device
+Logging to runs/teacher_large_v5
+Eval num_timesteps=20000, episode_reward=-247.75 +/- 48.41
+Episode length: 204.30 +/- 110.91
+Success rate: 0.00%
+-----------------------------------------------------
+| eval/              |                              |
+|    mean_ep_length  | 204                          |
+|    mean_reward     | -248                         |
+|    success_rate    | 0                            |
+| model/             |                              |
+|    extractor_type  | TransformerFeaturesExtractor |
+|    parameters      | 5865051                      |
+| time/              |                              |
+|    total_timesteps | 20000                        |
+-----------------------------------------------------
+New best mean reward!
+-----------------------------------------
+| eval/                      |          |
+|    best_seq_prediction_mse | 1.11     |
+|    seq_prediction_mse      | 1.11     |
+| rollout/                   |          |
+|    ep_len_mean             | 237      |
+|    ep_rew_mean             | -263     |
+|    success_rate            | 0        |
+| time/                      |          |
+|    fps                     | 825      |
+|    iterations              | 1        |
+|    time_elapsed            | 39       |
+|    total_timesteps         | 32768    |
+-----------------------------------------
+Eval num_timesteps=40000, episode_reward=-261.59 +/- 49.50
+Episode length: 224.10 +/- 122.54
+Success rate: 0.00%
+----------------------------------------
+| eval/                   |            |
+|    mean_ep_length       | 224        |
+|    mean_reward          | -262       |
+|    success_rate         | 0          |
+| time/                   |            |
+|    total_timesteps      | 40000      |
+| train/                  |            |
+|    approx_kl            | 0.86712307 |
+|    clip_fraction        | 0.865      |
+|    clip_range           | 0.199      |
+|    clip_range_vf        | 0.2        |
+|    entropy_loss         | -4.26      |
+|    explained_variance   | 0.157      |
+|    learning_rate        | 9.94e-05   |
+|    loss                 | 0.373      |
+|    n_updates            | 4          |
+|    policy_gradient_loss | 0.151      |
+|    std                  | 0.741      |
+|    value_loss           | 0.735      |
+----------------------------------------

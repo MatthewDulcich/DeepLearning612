@@ -1,0 +1,1 @@
+{"_timestamp":1.7532414483567338e+09,"global_step":20000,"eval/mean_reward":-247.75229,"eval/mean_ep_length":204.3,"_runtime":38.199855565,"_step":3,"eval/success_rate":0,"model/parameters":5.865051e+06,"_wandb":{"runtime":38}}

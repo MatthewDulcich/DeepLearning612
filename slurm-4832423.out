@@ -1,0 +1,3 @@
+Job started on cml31.umiacs.umd.edu at Tue Jul 22 21:12:05 EDT 2025
+/cmlscratch/advait25/drone_transformer_rl/drone_venv/bin/python: Error while finding module specification for 'drone_rl.train.train' (ModuleNotFoundError: No module named 'drone_rl')
+Job finished at Tue Jul 22 21:12:06 EDT 2025
