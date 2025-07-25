@@ -1,5 +1,5 @@
 env_id: FlyCraft-v0
-eval_freq: 20
+eval_freq: 10000
 n_envs: 1
 output_dir: runs
 policy: lstm
@@ -14,8 +14,8 @@ ppo_kwargs:
   gamma: 0.995
   learning_rate: 0.0003
   n_epochs: 50
-  n_steps: 128
+  n_steps: 1028
 run_name: baseline_lstm
-save_freq: 50
+save_freq: 20000
 seed: 11
-timesteps: 10000
+timesteps: 1000000
