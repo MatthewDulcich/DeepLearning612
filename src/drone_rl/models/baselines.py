@@ -316,27 +316,40 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
     def forward(self, obs):
         # Flatten and concatenate dict observation to tensor
         if isinstance(obs, dict):
-            # Assume each value is a tensor of shape (batch_size, ...) or (...,)
             obs_list = []
+            batch_size = None
             for k in sorted(obs.keys()):
                 v = obs[k]
                 if isinstance(v, np.ndarray):
                     v = torch.from_numpy(v)
                 if not torch.is_tensor(v):
                     v = torch.tensor(v)
-                # Flatten all but batch dimension
-                if v.dim() > 1:
-                    v = v.view(v.size(0), -1) if v.dim() == 2 else v.flatten()
+                # Ensure v is float32 for consistency
+                v = v.float()
+                # Always reshape to (batch_size, -1)
+                if v.dim() == 1:
+                    v = v.unsqueeze(0)
+                elif v.dim() > 2:
+                    v = v.view(v.size(0), -1)
+                # v is now (batch_size, feature_dim)
+                if batch_size is None:
+                    batch_size = v.size(0)
+                else:
+                    if v.size(0) != batch_size:
+                        raise ValueError(f"All obs tensors must have the same batch size, got {batch_size} and {v.size(0)} for key {k}")
                 obs_list.append(v)
             x = torch.cat(obs_list, dim=-1)
         else:
             x = obs
+            if x.dim() == 1:
+                x = x.unsqueeze(0)
+            elif x.dim() > 2:
+                x = x.view(x.size(0), -1)
 
-        # Now x is a tensor, continue as before
+        # Now x is (batch_size, feature_dim)
+        # Add sequence dimension if missing
         if x.dim() == 2:
-            x = x.unsqueeze(0)
-        elif x.dim() == 1:
-            x = x.unsqueeze(0).unsqueeze(0)
+            x = x.unsqueeze(1)  # (batch, seq=1, feat)
         batch_size = x.size(0)
         device = x.device
         h_0 = torch.zeros(self.num_layers, batch_size, self.lstm_hidden, device=device)
