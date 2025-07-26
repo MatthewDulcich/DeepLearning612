@@ -276,25 +276,13 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
     def __init__(
         self,
         observation_space: spaces.Dict,
-        lstm_hidden: int = 256,
+        lstm_hidden: int = 512,
         num_layers: int = 2,
-        dropout: float = 0.1
+        dropout: float = 0.2
     ):
-        """Initialize LSTM feature extractor.
-        
-        Parameters
-        ----------
-        observation_space : spaces.Dict
-            Observation space (expects dictionary of arrays)
-        lstm_hidden : int
-            Hidden size of LSTM layers
-        num_layers : int
-            Number of LSTM layers
-        dropout : float
-            Dropout probability between LSTM layers
-        """
+        """Improved LSTM feature extractor with LayerNorm and MLP."""
         super().__init__(observation_space, features_dim=lstm_hidden)
-        
+
         # Determine input size from observation space
         self.input_size = 0
         for space in observation_space.values():
@@ -302,7 +290,7 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
                 self.input_size += int(np.prod(space.shape))
             else:
                 raise ValueError(f"Unsupported observation space: {space}")
-        
+
         self.lstm_hidden = lstm_hidden
         self.num_layers = num_layers
         self.lstm = nn.LSTM(
@@ -312,6 +300,14 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
             batch_first=True,
             dropout=dropout if num_layers > 1 else 0
         )
+        self.ln = nn.LayerNorm(lstm_hidden)
+        self.mlp = nn.Sequential(
+            nn.Linear(lstm_hidden, lstm_hidden),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(lstm_hidden, lstm_hidden)
+        )
+        self._init_weights()
     
     def forward(self, obs):
         # Flatten and concatenate dict observation to tensor
@@ -324,14 +320,11 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
                     v = torch.from_numpy(v)
                 if not torch.is_tensor(v):
                     v = torch.tensor(v)
-                # Ensure v is float32 for consistency
                 v = v.float()
-                # Always reshape to (batch_size, -1)
                 if v.dim() == 1:
                     v = v.unsqueeze(0)
                 elif v.dim() > 2:
                     v = v.view(v.size(0), -1)
-                # v is now (batch_size, feature_dim)
                 if batch_size is None:
                     batch_size = v.size(0)
                 else:
@@ -346,17 +339,27 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
             elif x.dim() > 2:
                 x = x.view(x.size(0), -1)
 
-        # Now x is (batch_size, feature_dim)
-        # Add sequence dimension if missing
         if x.dim() == 2:
-            x = x.unsqueeze(1)  # (batch, seq=1, feat)
+            x = x.unsqueeze(1)
         batch_size = x.size(0)
         device = x.device
         h_0 = torch.zeros(self.num_layers, batch_size, self.lstm_hidden, device=device)
         c_0 = torch.zeros(self.num_layers, batch_size, self.lstm_hidden, device=device)
         lstm_out, _ = self.lstm(x, (h_0, c_0))
         features = lstm_out[:, -1, :]
+        features = self.ln(features)
+        features = self.mlp(features)
         return features
+
+    def _init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.orthogonal_(m.weight, gain=math.sqrt(2))
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.LayerNorm):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
 
 
 class SimpleLSTMPolicy(ActorCriticPolicy):
@@ -367,29 +370,14 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
     """
     
     def __init__(
-        self, 
-        *args, 
-        lstm_hidden: int = 256,
+        self,
+        *args,
+        lstm_hidden: int = 512,
         num_layers: int = 2,
-        dropout: float = 0.1,
+        dropout: float = 0.2,
         **kwargs
     ):
-        """Initialize LSTM policy.
-        
-        Parameters
-        ----------
-        *args : Any
-            Arguments for parent class
-        lstm_hidden : int
-            Hidden size of LSTM
-        num_layers : int
-            Number of LSTM layers
-        dropout : float
-            Dropout probability
-        **kwargs : Any
-            Keyword arguments for parent class
-        """
-        # Prepare feature extractor
+        """Improved LSTM policy with best practices."""
         features_extractor_class = LSTMFeatureExtractor
         features_extractor_kwargs = dict(
             lstm_hidden=lstm_hidden,
@@ -398,19 +386,32 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         )
         kwargs["features_extractor_class"] = features_extractor_class
         kwargs["features_extractor_kwargs"] = features_extractor_kwargs
-
-        # disables default mlp, so only features_extractor output is used
         kwargs["net_arch"] = []
-
         kwargs.pop("lstm_hidden", None)
         kwargs.pop("num_layers", None)
         kwargs.pop("dropout", None)
-
         super().__init__(*args, **kwargs)
 
+        # Improved action/value heads
         if isinstance(self.action_space, spaces.Box):
-            self.action_mean = nn.Linear(self.features_dim, self.action_space.shape[0])
+            self.action_mean = nn.Sequential(
+                nn.Linear(self.features_dim, self.features_dim),
+                nn.GELU(),
+                nn.Linear(self.features_dim, self.action_space.shape[0])
+            )
             self.action_log_std = nn.Parameter(torch.zeros(self.action_space.shape[0]))
+        elif isinstance(self.action_space, spaces.Discrete):
+            self.action_net = nn.Sequential(
+                nn.Linear(self.features_dim, self.features_dim),
+                nn.GELU(),
+                nn.Linear(self.features_dim, self.action_space.n)
+            )
+        self.value_net = nn.Sequential(
+            nn.Linear(self.features_dim, self.features_dim),
+            nn.GELU(),
+            nn.Linear(self.features_dim, 1)
+        )
+        self.apply(self._weights_init)
     
     @staticmethod
     def _weights_init(module: nn.Module) -> None:

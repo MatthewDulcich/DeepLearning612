@@ -1,3 +1,4 @@
+timesteps: 1000000
 env_id: FlyCraft-v0
 run_name: baseline_lstm
 output_dir: runs
@@ -6,17 +7,19 @@ n_envs: 1
 
 policy: lstm
 policy_kwargs:
-  lstm_hidden: 256
+  lstm_hidden: 512
   lstm_layers: 2
-  dropout: 0.1
+  dropout: 0.2
 
 ppo_kwargs:
-  learning_rate: 3.0e-4
-  n_steps: 1028
+  learning_rate: 1.0e-4
+  n_steps: 256
   batch_size: 128
-  n_epochs: 50
-  gamma: 0.995
-  gae_lambda: 0.95
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.98
+  ent_coef: 0.02
+  vf_coef: 1.0
   clip_range: 0.2
 
 timesteps: 1000000
