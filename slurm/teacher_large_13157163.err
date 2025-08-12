@@ -1,0 +1,96 @@
+Loading cuda/12.3.0/gcc/11.3.0/zen2
+  Loading requirement: gcc/11.3.0
+Currently Loaded Modulefiles:
+ 1) gcc/11.3.0   2) cuda/12.3.0/gcc/11.3.0/zen2(default)  
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+wandb: Tracking run with wandb version 0.17.0
+wandb: W&B syncing is set to `offline` in this directory.  
+wandb: Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+/scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/drone_rl/models/transformer_policy.py:39: FutureWarning: xformers.components is deprecated and is not maintained anymore. It might be removed in a future version of xFormers 
+  from xformers.components.attention import MultiHeadAttention as XfMultiHeadAttention  # type: ignore
+wandb: - 0.000 MB of 0.000 MB uploadedwandb:                                                                                
+wandb: 
+wandb: Run history:
+wandb: eval/best_seq_prediction_mse █▆▆▅▄▄▃▃▂▁
+wandb:          eval/mean_ep_length ▄▁▆▆▂▄▆▅▅▄▄▆▇▄▅▆▄▆▅▂▄▇▅▇▅▅▂▄▂▄▅▃▄█▅▄▄▅▆▅
+wandb:             eval/mean_reward ▁▆▂▃▆▃▃▄▄▅▆▂▅▄▅▅▆▃▃█▄▅▅▄▅▅█▅▇▆▄▅▃▁▂▄▄▄▃▆
+wandb:      eval/seq_prediction_mse ▆█▅▂▂▁▁▁▂▃▃▃▂▂▃▃▄▃▄▃▄▃▃▄▄▄▄▃▄▅▆▅▄▅▄▄▆▇▄▅
+wandb:            eval/success_rate ▁▁▁▁▁▁▁▁▁▁▁▁█▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:                  global_step ▁▁▁▁▂▂▂▂▂▃▃▃▃▃▃▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇▇███
+wandb:             model/parameters ▁
+wandb:          rollout/ep_len_mean ▁▁▇▇▇▇██████████████▇██▇▇▇█▇▇█▇▆▇▇▆▆▇▅▇▅
+wandb:          rollout/ep_rew_mean ██▂▂▂▄▃▃▂▂▃▂▃▃▃▃▁▄▃▄▅▃▃▄▄▄▃▄▃▅▅▅▃▄▆▃▄▆▃▆
+wandb:         rollout/success_rate ▁▅▁▁▁▁▁▁▁▁▁▁▁▁▁█▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:                     time/fps ██▃▃▃▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▂▁▂▁▁
+wandb:              train/approx_kl █▄▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:          train/clip_fraction █▇▅▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▂▂▂▂▂
+wandb:             train/clip_range ████▇▇▇▇▇▆▆▆▆▆▆▅▅▅▅▅▄▄▄▄▄▄▃▃▃▃▃▂▂▂▂▂▂▁▁▁
+wandb:          train/clip_range_vf ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:           train/entropy_loss ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:     train/explained_variance █▇▂▁▂▃▂▂▂▃▃▃▃▂▃▃▃▄▃▃▃▃▃▃▂▃▄▃▄▄▄▄▄▃▃▃▃▃▃▃
+wandb:          train/learning_rate ████▇▇▇▇▇▆▆▆▆▆▆▅▅▅▅▅▄▄▄▄▄▄▃▃▃▃▃▂▂▂▂▂▂▁▁▁
+wandb:                   train/loss █▅▄▂▂▂▃▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:   train/policy_gradient_loss █▅▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:                    train/std ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:             train/value_loss ▅▃█▇▅▆▆▅▅▄▃▃▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▂▁▂
+wandb: 
+wandb: Run summary:
+wandb: eval/best_seq_prediction_mse 0.52604
+wandb:          eval/mean_ep_length 252.8
+wandb:             eval/mean_reward -261.29965
+wandb:      eval/seq_prediction_mse 0.79087
+wandb:            eval/success_rate 0.0
+wandb:                  global_step 5013504
+wandb:             model/parameters 5865051.0
+wandb:          rollout/ep_len_mean 342.13
+wandb:          rollout/ep_rew_mean -281.65454
+wandb:         rollout/success_rate 0.0
+wandb:                     time/fps 355.0
+wandb:              train/approx_kl 0.00173
+wandb:          train/clip_fraction 0.10304
+wandb:             train/clip_range 0.10039
+wandb:          train/clip_range_vf 0.3
+wandb:           train/entropy_loss -4.25682
+wandb:     train/explained_variance 0.10731
+wandb:          train/learning_rate 1e-05
+wandb:                   train/loss -0.07146
+wandb:   train/policy_gradient_loss 0.00123
+wandb:                    train/std 0.74082
+wandb:             train/value_loss 0.04125
+wandb: 
+wandb: You can sync this run to the cloud by running:
+wandb: wandb sync /scratch/zt1/project/msml612/user/link/drone_transformer_rl/src/wandb/offline-run-20250811_163017-zcq8oi97
+wandb: Find logs at: ./wandb/offline-run-20250811_163017-zcq8oi97/logs
