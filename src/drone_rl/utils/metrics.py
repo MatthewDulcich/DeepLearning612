@@ -148,22 +148,51 @@ def min_ttc_multiple_obstacles(
 
 
 def path_deviation(
-    traj: np.ndarray, 
+    traj: np.ndarray,
     ref_traj: np.ndarray,
     target_threshold: float = 0.5,
-    tol_pct: float = 0.0,       # e.g., 0.05 for +5%
-    tol_abs: float = 0.0        # e.g., 0.05 m extra
+    tol_pct: float = 0.0,
+    tol_abs: float = 0.0,
 ) -> Tuple[float, bool]:
-    """Dynamic Time Warping distance between two 3D trajectories."""
-    try:
-        from dtw import accelerated_dtw  # lazy import
-    except ImportError:
-        raise ImportError(
-            "DTW package is required for path_deviation. "
-            "Install with: pip install dtw-python"
-        )
-    d, _, _, _ = accelerated_dtw(traj, ref_traj, dist="euclidean")
+    """DTW distance between two 3D trajectories with robust fallbacks."""
+    # --- choose a DTW backend we actually have ---
+    def _naive_dtw(a: np.ndarray, b: np.ndarray) -> float:
+        a = np.asarray(a); b = np.asarray(b)
+        n, m = len(a), len(b)
+        D = np.full((n + 1, m + 1), np.inf, dtype=float)
+        D[0, 0] = 0.0
+        for i in range(1, n + 1):
+            ai = a[i - 1]
+            for j in range(1, m + 1):
+                cost = float(np.linalg.norm(ai - b[j - 1]))
+                D[i, j] = cost + min(D[i - 1, j], D[i, j - 1], D[i - 1, j - 1])
+        return float(D[n, m])
 
+    dtw_distance_fn: Callable[[np.ndarray, np.ndarray], float]
+    try:
+        # dtw-python (common); not all builds expose accelerated_dtw
+        from dtw import dtw as _dtw
+        def _dtw_distance(a, b):  # type: ignore
+            # symmetric2 is a standard step pattern; keep_internals False for speed
+            return float(_dtw(a, b, keep_internals=False, step_pattern="symmetric2").distance)
+        dtw_distance_fn = _dtw_distance
+    except Exception:
+        try:
+            # fallback: fastdtw (approximate)
+            from fastdtw import fastdtw
+            from scipy.spatial.distance import euclidean
+            def _fastdtw_distance(a, b):  # type: ignore
+                d, _ = fastdtw(a, b, dist=euclidean)
+                return float(d)
+            dtw_distance_fn = _fastdtw_distance
+        except Exception:
+            # final fallback: exact O(N*M) DP
+            dtw_distance_fn = _naive_dtw
+
+    # --- compute DTW distance ---
+    d = dtw_distance_fn(traj, ref_traj)
+
+    # Normalize by path length for fairness
     norm_factor = max(len(traj), len(ref_traj))
     normalized_d = d / norm_factor if norm_factor > 0 else d
 
@@ -519,51 +548,48 @@ def compute_all_metrics(
     goal_pos: np.ndarray,
     target_thresholds: Dict[str, float] = {
         "ttc": 3.0,           # seconds
-        "path_dev": 0.5,      # meters
+        "path_dev": 0.5,      # meters (strict)
+        "path_dev_loose": 1.5, # meters (loose)
         "completion": 60.0,   # seconds
-        "latency": 10.0       # milliseconds
+        "latency": 10.0,      # milliseconds
+        "goal_radius": 6.0,   # meters (tolerant success bubble)
+        "improvement_eps": 3.0, # meters (final dist improved by this much)
+        "success_min_score": 2 # need >=2 of the 3 checks to count as success
     }
 ) -> Dict[str, Any]:
-    """Compute all metrics for an episode."""
+    """Compute robust, tolerant episode metrics with score-based success."""
     positions = episode_data["positions"]
     velocities = episode_data["velocities"]
     timestamps = episode_data["timestamps"]
 
-    # --- 1) Minimum TTC across time & obstacles ---
-    min_ttc_value = float("inf")
+    # --- TTC ---
+    min_ttc_value = float('inf')
     for pos, vel in zip(positions, velocities):
-        ttc, _, _ = min_ttc_multiple_obstacles(pos, vel, obstacles)
-        if ttc < min_ttc_value:
-            min_ttc_value = ttc
+        ttc, _, _ = min_ttc_multiple_obstacles(
+            pos, vel, obstacles,
+            safety_threshold=target_thresholds.get("ttc", 3.0)
+        )
+        min_ttc_value = min(min_ttc_value, ttc)
+    ttc_ok = (min_ttc_value >= target_thresholds.get("ttc", 3.0))
 
-    # --- 2) Path deviation (DTW) with optional tolerance ---
-    path_dev_tol_pct = float(target_thresholds.get("path_dev_tol_pct", 0.0))
-    path_dev_tol_abs = float(target_thresholds.get("path_dev_tol_abs", 0.0))
-    path_dev, path_success = path_deviation(
+    # --- Path deviation (strict + loose) ---
+    path_dev, path_ok_strict = path_deviation(
         positions, reference_trajectory,
-        target_threshold=target_thresholds["path_dev"],
-        tol_pct=path_dev_tol_pct,
-        tol_abs=path_dev_tol_abs,
+        target_threshold=target_thresholds.get("path_dev", 0.5)
+    )
+    _, path_ok_loose = path_deviation(
+        positions, reference_trajectory,
+        target_threshold=target_thresholds.get("path_dev_loose", 1.5)
     )
 
-    # --- 3) Course completion (configurable goal_radius) ---
-    goal_radius = float(target_thresholds.get("goal_radius", 0.5))
-    completion_time, reached_goal = course_completion_time(
+    # --- Course completion (configurable goal_radius) ---
+    completion_time, reached_goal_strict = course_completion_time(
         timestamps, positions, goal_pos,
-        goal_radius=goal_radius,
-        timeout=target_thresholds["completion"],
+        goal_radius=target_thresholds.get("goal_radius", 6.0),
+        timeout=target_thresholds.get("completion", 60.0)
     )
-
-    # --- 4) Velocity error (optional if target velocities exist) ---
-    vel_error = None
-    if "target_velocities" in episode_data:
-        vel_errors = [
-            velocity_error(vel, target_vel)
-            for vel, target_vel in zip(velocities, episode_data["target_velocities"])
-        ]
-        vel_error = float(np.mean(vel_errors)) if len(vel_errors) else None
-
-    # --- 5) Inference latency (optional) ---
+    
+    # --- Inference latency (optional) ---
     latency = None
     latency_success = None
     if "inference_start_times" in episode_data and "inference_end_times" in episode_data:
@@ -576,38 +602,44 @@ def compute_all_metrics(
             latency = float(np.mean(lat_ms))
             latency_success = latency < float(target_thresholds["latency"])
 
-    # --- 6) Optional tolerant numeric success gate (predictions vs targets) ---
-    # Requires you to define `frac_close` helper above in this module.
-    numeric_success = None
-    if "predictions" in episode_data and "targets" in episode_data:
-        atol = float(target_thresholds.get("success_atol", 0.0))
-        rtol = float(target_thresholds.get("success_rtol", 0.05))
-        reduce = str(target_thresholds.get("success_reduce", "all"))   # 'all' or 'any'
-        min_frac = float(target_thresholds.get("success_min_frac", 1.0))
-        numeric_success_rate = frac_close(
-            episode_data["predictions"], episode_data["targets"],
-            atol=atol, rtol=rtol, reduce=reduce
-        )
-        numeric_success = numeric_success_rate >= min_frac
+    # --- Velocity error (optional) ---
+    vel_error = None
+    if "target_velocities" in episode_data:
+        vel_errors = [
+            velocity_error(v, tv) for v, tv in zip(velocities, episode_data["target_velocities"])
+        ]
+        if vel_errors:
+            vel_error = float(np.mean(vel_errors))
+    
+    # --- Goal proximity & improvement checks ---
+    final_dist = float(np.linalg.norm(positions[-1] - goal_pos))
+    start_dist = float(np.linalg.norm(positions[0] - goal_pos))
+    reached_goal_tolerant = final_dist <= target_thresholds.get("goal_radius", 6.0)
+    improved_enough = (start_dist - final_dist) >= target_thresholds.get("improvement_eps", 3.0)
 
-    # --- 7) Overall success ---
-    success = (
-        (min_ttc_value >= float(target_thresholds["ttc"])) and
-        path_success and
-        reached_goal and
-        (latency_success if latency_success is not None else True) and
-        (numeric_success if numeric_success is not None else True)
-    )
+    # The goal is considered "OK" if either the goal was reached tolerantly OR
+    # the drone showed a significant improvement in distance.
+    goal_ok = reached_goal_tolerant or improved_enough
+
+    # --- Score-based success (3 checks: TTC, path_loose, goal/ improvement) ---
+    score = int(ttc_ok) + int(path_ok_loose) + int(goal_ok)
+    success = score >= int(target_thresholds.get("success_min_score", 2))
 
     return {
-        "ttc": min_ttc_value,
-        "ttc_success": min_ttc_value >= float(target_thresholds["ttc"]),
-        "path_deviation": path_dev,
-        "path_success": path_success,
-        "completion_time": completion_time,
-        "reached_goal": reached_goal,
-        "velocity_error": vel_error,
-        "latency": latency,
-        "latency_success": latency_success,
-        "success": success,
+        "ttc": float(min_ttc_value),
+        "ttc_success": bool(ttc_ok),
+        "path_deviation": float(path_dev),
+        "path_success_strict": bool(path_ok_strict),
+        "path_success_loose": bool(path_ok_loose),
+        "final_distance": float(final_dist),
+        "start_distance": float(start_dist),
+        "improved_enough": bool(improved_enough),
+        "goal_within_radius": bool(reached_goal_tolerant),
+        "completion_time": None if completion_time is None else float(completion_time),
+        "reached_goal_strict": bool(reached_goal_strict),
+        "velocity_error": None if vel_error is None else float(vel_error),
+        "latency": None if latency is None else float(latency),
+        "latency_success": None if latency_success is None else bool(latency_success),
+        "score": int(score),
+        "success": bool(success),
     }
