@@ -32,3 +32,20 @@ n_eval_episodes: 10
 use_spatio_temporal: true
 predict_sequence: true
 prediction_horizon: 200
+eval:
+  # primary thresholds
+  ttc: 3.0                 # seconds
+  path_dev: 0.5            # meters
+  completion: 60.0         # seconds
+  latency: 10.0            # ms
+  goal_radius: 0.6         # a bit looser than 0.5
+
+  # tolerances for path deviation
+  path_dev_tol_pct: 0.10   # +10% cushion (set 0.05 for +5%)
+  path_dev_tol_abs: 0.00
+
+  # tolerant numeric compare (only used if you provide predictions/targets in episode_data)
+  success_atol: 0.0
+  success_rtol: 0.05       # 5% relative window
+  success_reduce: "all"    # 'all' or 'any' across dims
+  success_min_frac: 1.0    # require 100% of dims to be “close” (lower to 0.5 if needed)

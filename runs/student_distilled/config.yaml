@@ -1,0 +1,28 @@
+distillation_alpha: 0.5
+distillation_temperature: 2.0
+distillation_weight: 0.7
+env_id: FlyCraft-Nav-v0
+eval_freq: 10000
+n_envs: 8
+output_dir: runs
+policy: transformer
+policy_kwargs:
+  transformer_kwargs:
+    depth: 4
+    dropout: 0.1
+    embed_dim: 256
+    memory_size: 64
+    num_heads: 8
+ppo_kwargs:
+  batch_size: 2048
+  clip_range: 0.2
+  gae_lambda: 0.95
+  gamma: 0.995
+  learning_rate: 0.0001
+  n_epochs: 3
+  n_steps: 1024
+run_name: student_distilled
+save_freq: 20000
+seed: 7
+teacher_model: runs/teacher_large/final_model.zip
+timesteps: 2000000

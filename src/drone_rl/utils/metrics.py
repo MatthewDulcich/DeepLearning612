@@ -22,6 +22,28 @@ import numpy as np
 import torch
 from torch import nn
 
+# ---- tolerant comparisons ----
+def is_close(pred, target, atol: float = 0.0, rtol: float = 0.05) -> np.ndarray:
+    """
+    True if |pred - target| <= atol + rtol*|target|.
+    Works with scalars or arrays; returns boolean array or scalar.
+    """
+    pred = np.asarray(pred)
+    target = np.asarray(target)
+    return np.isclose(pred, target, atol=atol, rtol=rtol, equal_nan=False)
+
+
+def frac_close(pred, target, atol: float = 0.0, rtol: float = 0.05, reduce: str = "all") -> float:
+    """
+    Fraction of items 'close enough'. If reduce='all', requires all dims per sample.
+    """
+    close = is_close(pred, target, atol=atol, rtol=rtol)
+    if close.ndim == 0:
+        return float(close)
+    if reduce == "any":
+        return float(np.mean(close.any(axis=-1))) if close.ndim > 1 else float(np.mean(close))
+    return float(np.mean(close.all(axis=-1))) if close.ndim > 1 else float(np.mean(close))
+
 
 def time_to_collision(
     position: np.ndarray, 
@@ -128,24 +150,11 @@ def min_ttc_multiple_obstacles(
 def path_deviation(
     traj: np.ndarray, 
     ref_traj: np.ndarray,
-    target_threshold: float = 0.5
+    target_threshold: float = 0.5,
+    tol_pct: float = 0.0,       # e.g., 0.05 for +5%
+    tol_abs: float = 0.0        # e.g., 0.05 m extra
 ) -> Tuple[float, bool]:
-    """Dynamic Time Warping distance between two 3D trajectories.
-    
-    Parameters
-    ----------
-    traj : np.ndarray
-        (N, 3) trajectory to evaluate
-    ref_traj : np.ndarray
-        (M, 3) reference trajectory
-    target_threshold : float
-        Target maximum deviation in meters (default: 0.5m)
-    
-    Returns
-    -------
-    Tuple[float, bool]
-        DTW distance and success flag (True if deviation < target_threshold)
-    """
+    """Dynamic Time Warping distance between two 3D trajectories."""
     try:
         from dtw import accelerated_dtw  # lazy import
     except ImportError:
@@ -153,15 +162,14 @@ def path_deviation(
             "DTW package is required for path_deviation. "
             "Install with: pip install dtw-python"
         )
-    
-    # Compute DTW distance
     d, _, _, _ = accelerated_dtw(traj, ref_traj, dist="euclidean")
-    
-    # Normalize by path length for fair comparison across trajectories
+
     norm_factor = max(len(traj), len(ref_traj))
     normalized_d = d / norm_factor if norm_factor > 0 else d
-    
-    return float(normalized_d), normalized_d < target_threshold
+
+    margin = tol_abs + tol_pct * target_threshold
+    return float(normalized_d), normalized_d <= (target_threshold + margin)
+
 
 
 def velocity_error(
@@ -516,82 +524,84 @@ def compute_all_metrics(
         "latency": 10.0       # milliseconds
     }
 ) -> Dict[str, Any]:
-    """Compute all metrics for an episode.
-    
-    Parameters
-    ----------
-    episode_data : Dict[str, np.ndarray]
-        Dictionary with episode data (positions, velocities, timestamps, etc.)
-    reference_trajectory : np.ndarray
-        Reference trajectory for path deviation
-    obstacles : List[Tuple[np.ndarray, float]]
-        List of (obstacle_pos, obstacle_radius) tuples
-    goal_pos : np.ndarray
-        Goal position
-    target_thresholds : Dict[str, float]
-        Dictionary with target thresholds for each metric
-    
-    Returns
-    -------
-    Dict[str, Any]
-        Dictionary with all computed metrics
-    """
+    """Compute all metrics for an episode."""
     positions = episode_data["positions"]
     velocities = episode_data["velocities"]
     timestamps = episode_data["timestamps"]
-    
-    # Compute minimum TTC across all timesteps and obstacles
-    min_ttc_value = float('inf')
-    for i, (pos, vel) in enumerate(zip(positions, velocities)):
+
+    # --- 1) Minimum TTC across time & obstacles ---
+    min_ttc_value = float("inf")
+    for pos, vel in zip(positions, velocities):
         ttc, _, _ = min_ttc_multiple_obstacles(pos, vel, obstacles)
-        min_ttc_value = min(min_ttc_value, ttc)
-    
-    # Compute path deviation
+        if ttc < min_ttc_value:
+            min_ttc_value = ttc
+
+    # --- 2) Path deviation (DTW) with optional tolerance ---
+    path_dev_tol_pct = float(target_thresholds.get("path_dev_tol_pct", 0.0))
+    path_dev_tol_abs = float(target_thresholds.get("path_dev_tol_abs", 0.0))
     path_dev, path_success = path_deviation(
-        positions, reference_trajectory, 
-        target_threshold=target_thresholds["path_dev"]
+        positions, reference_trajectory,
+        target_threshold=target_thresholds["path_dev"],
+        tol_pct=path_dev_tol_pct,
+        tol_abs=path_dev_tol_abs,
     )
-    
-    # Compute course completion
+
+    # --- 3) Course completion (configurable goal_radius) ---
+    goal_radius = float(target_thresholds.get("goal_radius", 0.5))
     completion_time, reached_goal = course_completion_time(
         timestamps, positions, goal_pos,
-        timeout=target_thresholds["completion"]
+        goal_radius=goal_radius,
+        timeout=target_thresholds["completion"],
     )
-    
-    # Compute average velocity error if target velocities available
+
+    # --- 4) Velocity error (optional if target velocities exist) ---
     vel_error = None
     if "target_velocities" in episode_data:
         vel_errors = [
-            velocity_error(vel, target_vel) 
+            velocity_error(vel, target_vel)
             for vel, target_vel in zip(velocities, episode_data["target_velocities"])
         ]
-        vel_error = np.mean(vel_errors)
-    
-    # Compute latency if available
+        vel_error = float(np.mean(vel_errors)) if len(vel_errors) else None
+
+    # --- 5) Inference latency (optional) ---
     latency = None
     latency_success = None
-    if "inference_times" in episode_data:
-        latencies = [
-            latency_ms(start, end, target_thresholds["latency"])[0]
-            for start, end in zip(
-                episode_data["inference_start_times"],
-                episode_data["inference_end_times"]
-            )
+    if "inference_start_times" in episode_data and "inference_end_times" in episode_data:
+        lat_ms = [
+            latency_ms(s, e, target_thresholds["latency"])[0]
+            for s, e in zip(episode_data["inference_start_times"],
+                            episode_data["inference_end_times"])
         ]
-        latency = np.mean(latencies)
-        latency_success = latency < target_thresholds["latency"]
-    
-    # Overall success
+        if len(lat_ms):
+            latency = float(np.mean(lat_ms))
+            latency_success = latency < float(target_thresholds["latency"])
+
+    # --- 6) Optional tolerant numeric success gate (predictions vs targets) ---
+    # Requires you to define `frac_close` helper above in this module.
+    numeric_success = None
+    if "predictions" in episode_data and "targets" in episode_data:
+        atol = float(target_thresholds.get("success_atol", 0.0))
+        rtol = float(target_thresholds.get("success_rtol", 0.05))
+        reduce = str(target_thresholds.get("success_reduce", "all"))   # 'all' or 'any'
+        min_frac = float(target_thresholds.get("success_min_frac", 1.0))
+        numeric_success_rate = frac_close(
+            episode_data["predictions"], episode_data["targets"],
+            atol=atol, rtol=rtol, reduce=reduce
+        )
+        numeric_success = numeric_success_rate >= min_frac
+
+    # --- 7) Overall success ---
     success = (
-        min_ttc_value >= target_thresholds["ttc"] and
+        (min_ttc_value >= float(target_thresholds["ttc"])) and
         path_success and
         reached_goal and
-        (latency_success if latency_success is not None else True)
+        (latency_success if latency_success is not None else True) and
+        (numeric_success if numeric_success is not None else True)
     )
-    
+
     return {
         "ttc": min_ttc_value,
-        "ttc_success": min_ttc_value >= target_thresholds["ttc"],
+        "ttc_success": min_ttc_value >= float(target_thresholds["ttc"]),
         "path_deviation": path_dev,
         "path_success": path_success,
         "completion_time": completion_time,
@@ -599,5 +609,5 @@ def compute_all_metrics(
         "velocity_error": vel_error,
         "latency": latency,
         "latency_success": latency_success,
-        "success": success
+        "success": success,
     }
