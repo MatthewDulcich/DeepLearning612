@@ -68,25 +68,20 @@ def main():
 
     # --- Minimal rollout and ACMI writer ---
     def extract_pos_vel(obs, info):
-        # Try info first
-        pos = info.get("drone_position")
-        vel = info.get("drone_velocity")
-        if pos is not None and vel is not None:
-            return np.array(pos), np.array(vel)
-        # Try obs dict
+        # Use achieved_goal as position if available
         if isinstance(obs, dict):
-            pos = obs.get("position")
-            vel = obs.get("velocity")
-            if pos is not None and vel is not None:
+            pos = obs.get("achieved_goal")
+            obs_arr = obs.get("observation")
+            if obs_arr is not None and len(obs_arr) >= 6:
+                vel = obs_arr[3:6]
+            else:
+                vel = np.zeros(3)
+            if pos is not None:
                 return np.array(pos), np.array(vel)
-        # Try obs as flat array: assume [x, y, z, vx, vy, vz, ...]
-        if isinstance(obs, (np.ndarray, list)) and len(obs) >= 6:
-            arr = np.array(obs)
-            return arr[:3], arr[3:6]
-        # Fallback: zeros
+        # fallback
         return np.zeros(3), np.zeros(3)
 
-    def rollout_and_save_acmi(env, model, acmi_path, max_steps=1000):
+    def rollout_and_save_acmi(env, model, max_steps=1000):
         """Run a rollout and save trajectory as .acmi file. Returns (success, trajectory)."""
         obs, info = env.reset()
         trajectory = []
@@ -115,32 +110,37 @@ def main():
                 # Check for success flag in info, or define your own success condition
                 success = info.get("is_success", False)
                 break
-        # Write ACMI file
-        with open(acmi_path, "w") as f:
-            f.write("FileType=text/acmi/tacview\n")
-            f.write("FileVersion=2.1\n")
-            f.write("0,ReferenceTime=2025-07-24T00:00:00Z\n")
-            f.write("0,Title=FlyCraft RL Rollout\n")
-            f.write("0,Author=DeepLearning612 RL Demo\n")
-            f.write("0,DataSource=RL Simulation\n")
-            f.write("0,Recorder=generate_acmi.py\n")
-            f.write("0,\n")
-            f.write("0,AddObject,Aircraft,1\n")
-            f.write("0,1,Name=Drone\n")
-            f.write("0,1,Type=UAV\n")
-            f.write("0,1,Color=Blue\n")
-            for t, x, y, z, vx, vy, vz in trajectory:
-                f.write(f"{t:.2f},1,T={x:.2f}|{y:.2f}|{z:.2f}|{vx:.2f}|{vy:.2f}|{vz:.2f}\n")
-            f.write("0,RemoveObject,1\n")
-        print(f"Saved ACMI file to: {acmi_path}")
-        return success
+        return success, trajectory
 
     # Minimal loop: keep running until success
     attempt = 0
+    save_every = 100  # Set your interval here
+
     while True:
         attempt += 1
         acmi_path = save_dir / f"rollout_{args.algo}_attempt{attempt}.acmi"
-        success = rollout_and_save_acmi(env, model, acmi_path, max_steps=config.get("max_steps", 1000))
+        success, trajectory = rollout_and_save_acmi(env, model, max_steps=config.get("max_steps", 1000))
+        
+        # Only save every x attempts or if successful
+        if (attempt % save_every == 0) or success:
+            with open(acmi_path, "w") as f:
+                f.write("FileType=text/acmi/tacview\n")
+                f.write("FileVersion=2.1\n")
+                f.write("0,ReferenceTime=2025-07-24T00:00:00Z\n")
+                f.write("0,Title=FlyCraft RL Rollout\n")
+                f.write("0,Author=DeepLearning612 RL Demo\n")
+                f.write("0,DataSource=RL Simulation\n")
+                f.write("0,Recorder=generate_acmi.py\n")
+                f.write("0,\n")
+                f.write("0,AddObject,Aircraft,1\n")
+                f.write("0,1,Name=Drone\n")
+                f.write("0,1,Type=UAV\n")
+                f.write("0,1,Color=Blue\n")
+                for t, x, y, z, vx, vy, vz in trajectory:
+                    f.write(f"{t:.2f},1,T={x:.2f}|{y:.2f}|{z:.2f}|{vx:.2f}|{vy:.2f}|{vz:.2f}\n")
+                f.write("0,RemoveObject,1\n")
+            print(f"Saved ACMI file to: {acmi_path}")
+
         if success:
             print(f"Success on attempt {attempt}!")
             break
