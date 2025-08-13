@@ -50,6 +50,9 @@ def main():
     parser.add_argument("--save-dir", type=str, default="demo/acmi_logs", help="Directory to save .acmi file.")
     parser.add_argument("--algo", type=str, default="lstm", choices=["transformer", "lstm", "pid"], help="Policy type.")
     parser.add_argument("--save-acmi", action="store_true", help="Save .acmi file for Tacview visualization.")
+    parser.add_argument("--origin-lon", type=float, default=0.0, help="Reference longitude in degrees for flat-world export (spherical anchor).")
+    parser.add_argument("--origin-lat", type=float, default=0.0, help="Reference latitude in degrees for flat-world export (spherical anchor).")
+    parser.add_argument("--alt-offset", type=float, default=0.0, help="Meters to add to altitude when exporting (useful if sim Z=AGL).")
     args = parser.parse_args()
 
     # Load config (YAML)
@@ -108,26 +111,6 @@ def main():
         print("[DEBUG] Could not extract pos/vel, returning zeros.")
         return np.zeros(3), np.zeros(3)
 
-        def extract_pos_vel(obs, info):
-            # Try info first
-            pos = info.get("drone_position")
-            vel = info.get("drone_velocity")
-            if pos is not None and vel is not None:
-                return np.array(pos), np.array(vel)
-            # Try obs dict
-            if isinstance(obs, dict):
-                pos = obs.get("position")
-                vel = obs.get("velocity")
-                if pos is not None and vel is not None:
-                    return np.array(pos), np.array(vel)
-            # Try obs as flat array: assume [x, y, z, vx, vy, vz, ...]
-            if isinstance(obs, (np.ndarray, list)) and len(obs) >= 6:
-                arr = np.array(obs)
-                # Print for debugging
-                print(f"[DEBUG] Flat obs: {arr}")
-                return arr[:3], arr[3:6]
-            # Fallback: zeros
-            return np.zeros(3), np.zeros(3)
     def rollout_and_save_acmi(env, model, max_steps=1000):
         """Run a rollout and save trajectory as .acmi file. Returns (success, trajectory)."""
         obs, info = env.reset()
@@ -171,22 +154,46 @@ def main():
 
         # Only save every x attempts or if successful
         if (attempt % save_every == 0) or success:
-            with open(acmi_path, "w") as f:
+            with open(acmi_path, "w", encoding="utf-8", newline="\n") as f:
+                # --- ACMI 2.2 header ---
                 f.write("FileType=text/acmi/tacview\n")
-                f.write("FileVersion=2.1\n")
-                f.write("0,ReferenceTime=2025-07-24T00:00:00Z\n")
+                f.write("FileVersion=2.2\n")
+                f.write(f"0,ReferenceTime={config.get('reference_time', '2025-07-24T00:00:00Z')}\n")
                 f.write("0,Title=FlyCraft RL Rollout\n")
                 f.write("0,Author=DeepLearning612 RL Demo\n")
                 f.write("0,DataSource=RL Simulation\n")
-                f.write("0,Recorder=generate_acmi.py\n")
-                f.write("0,\n")
-                f.write("0,AddObject,Aircraft,1\n")
-                f.write("0,1,Name=Drone\n")
-                f.write("0,1,Type=UAV\n")
-                f.write("0,1,Color=Blue\n")
-                for t, x, y, z, vx, vy, vz in trajectory:
-                    f.write(f"{t:.2f},1,T={x:.2f}|{y:.2f}|{z+100:.2f}|{vx:.2f}|{vy:.2f}|{vz:.2f}\n")
-                f.write("0,RemoveObject,1\n")
+                f.write("0,DataRecorder=generate_acmi.py\n")
+                # Optional numeric properties to anchor flat-world U/V
+                f.write(f"0,ReferenceLongitude={args.origin_lon}\n")
+                f.write(f"0,ReferenceLatitude={args.origin_lat}\n")
+
+                # --- Start of telemetry ---
+                # Use id '1' (hex) for our drone
+                if trajectory:
+                    first_t, x0, y0, z0, vx0, vy0, vz0 = trajectory[0]
+                else:
+                    first_t, x0, y0, z0 = 0.0, 0.0, 0.0, 0.0
+
+                # Initial frame and object creation with properties
+                f.write(f"#{first_t:.2f}\n")
+                f.write("1,Name=Drone,Type=Air+UAV,Color=Blue\n")
+                # Flat-world notation: T = Lon|Lat|Alt|U|V (meters for Alt/U/V)
+                f.write(
+                    f"1,T={args.origin_lon}|{args.origin_lat}|{z0 + args.alt_offset:.2f}|{x0:.2f}|{y0:.2f}\n"
+                )
+
+                # Subsequent frames
+                for (t, x, y, z, vx, vy, vz) in trajectory[1:]:
+                    f.write(f"#{t:.2f}\n")
+                    # Keep the same notation every time; provide full T for clarity
+                    f.write(
+                        f"1,T={args.origin_lon}|{args.origin_lat}|{z + args.alt_offset:.2f}|{x:.2f}|{y:.2f}\n"
+                    )
+
+                # Clean object removal at the end (instead of old RemoveObject command)
+                if trajectory:
+                    f.write(f"#{trajectory[-1][0]:.2f}\n")
+                f.write("-1\n")
             print(f"Saved ACMI file to: {acmi_path}")
 
         if success:
