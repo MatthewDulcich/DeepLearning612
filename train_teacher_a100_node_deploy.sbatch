@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=teacher_large
 #SBATCH --partition=gpu
-#SBATCH --gres=gpu:a100_1g.5gb:1
+#SBATCH --gres=gpu:a100:1
 #SBATCH --mem=64G
 #SBATCH --tmp=128G
 #SBATCH --cpus-per-task=6
@@ -65,7 +65,7 @@ cd src
 
 # Launch training
 /tmp/$USER/drone-rl/bin/python -m drone_rl.train.train \
-  --config ../configs/training/teacher_large_debug.yaml \
+  --config ../configs/training/teacher_large_rev3.yaml \
   --wandb
 
 # Save the exit code from the previous command
@@ -85,5 +85,6 @@ echo "\n---"
 echo "WANDB was run in offline mode. To upload your run after the job finishes, use:"
 echo "  wandb sync /scratch/zt1/project/msml612/user/link/wandb/"
 echo "Replace the path with your actual wandb run directory if different."
+
 # Exit with the cached exit code
 exit $ECODE
