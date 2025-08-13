@@ -32,6 +32,13 @@ try:
 except ImportError:
     WANDB_AVAILABLE = False
 
+# RecurrentPPO optional
+try:
+    from sb3_contrib import RecurrentPPO
+    RECURRENT_PPO_AVAILABLE = True
+except ImportError:
+    RECURRENT_PPO_AVAILABLE = False
+
 # cuda check
 try:
     from torch.cuda import is_available as cuda_available  # noqa: WPS433
@@ -373,18 +380,37 @@ def main() -> None:
     ppo_kwargs["target_kl"]     = None
 
     # --------- build model ---------
-    # Final pop to guarantee no features_dim is present
-    if policy_name == "lstm" and "features_dim" in policy_kwargs:
-        v = policy_kwargs.pop("features_dim")
-        print(f"[WARN] Removed lingering features_dim before model creation: {v}")
-    print(f"[DEBUG] Final policy_kwargs for {policy_name}: {policy_kwargs}")
-    model = PPO(
-        policy=policy_cls,
-        env=train_env,
-        tensorboard_log=str(run_dir / "tb"),
-        policy_kwargs=policy_kwargs,
-        **ppo_kwargs,
-    )
+    # Check if we should use RecurrentPPO
+    algorithm = cfg.get("algorithm", "PPO")
+    use_recurrent = algorithm == "RecurrentPPO" and RECURRENT_PPO_AVAILABLE
+    
+    if use_recurrent:
+        print(f"[INFO] Using RecurrentPPO for policy: {policy_name}")
+        # RecurrentPPO-specific kwargs
+        recurrent_kwargs = cfg.get("recurrent_kwargs", {})
+        
+        # Map config to RecurrentPPO parameters
+        model = RecurrentPPO(
+            policy="MlpLstmPolicy",  # Use built-in recurrent policy
+            env=train_env,
+            tensorboard_log=str(run_dir / "tb"),
+            **recurrent_kwargs,
+            **ppo_kwargs,
+        )
+    else:
+        # Regular PPO with custom policies
+        # Final pop to guarantee no features_dim is present
+        if policy_name == "lstm" and "features_dim" in policy_kwargs:
+            v = policy_kwargs.pop("features_dim")
+            print(f"[WARN] Removed lingering features_dim before model creation: {v}")
+        print(f"[DEBUG] Final policy_kwargs for {policy_name}: {policy_kwargs}")
+        model = PPO(
+            policy=policy_cls,
+            env=train_env,
+            tensorboard_log=str(run_dir / "tb"),
+            policy_kwargs=policy_kwargs,
+            **ppo_kwargs,
+        )
 
     # Sequence predictor
     if cfg.get("predict_sequence", False):

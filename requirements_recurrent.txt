@@ -1,0 +1,25 @@
+# Requirements for RecurrentPPO LSTM baseline training
+# Install with: pip install -r requirements_recurrent.txt
+
+# Core RL dependencies
+stable-baselines3>=2.0.0
+sb3-contrib>=2.0.0
+gymnasium
+flycraft
+
+# Data processing and logging
+numpy
+pandas
+torch
+tensorboard
+wandb
+
+# Demo dependencies (for Streamlit app)
+streamlit
+plotly
+matplotlib
+imageio
+
+# Development and utilities
+tqdm
+PyYAML

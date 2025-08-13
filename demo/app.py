@@ -36,6 +36,18 @@ from src.drone_rl.models.baselines import SimpleLSTMPolicy, DronePositionControl
 from src.drone_rl.utils.metrics import time_to_collision, path_deviation, velocity_error
 from stable_baselines3 import PPO
 
+# Try to import RecurrentPPO for compatibility with new LSTM models
+try:
+    from sb3_contrib import RecurrentPPO
+    RECURRENT_PPO_AVAILABLE = True
+except ImportError:
+    RECURRENT_PPO_AVAILABLE = False
+    RecurrentPPO = None
+    # Only show warning if this is actually being run as a Streamlit app
+    import sys
+    if 'streamlit' in sys.modules:
+        st.warning("RecurrentPPO not available. Install with: pip install sb3-contrib")
+
 # Page configuration
 st.set_page_config(
     page_title="Drone Transformer RL Demo",
@@ -101,15 +113,33 @@ def load_model(model_path: str, model_type: str = "transformer"):
             controller = DronePositionController()
             return controller, env
         
+        # Try to detect if this is a RecurrentPPO model by checking the path/filename
+        is_recurrent = "recurrent" in model_path.lower() or "lstm_recurrent" in model_path.lower()
+        
         # For transformer or LSTM, load from checkpoint
         if model_type == "transformer":
             custom_objects = {"policy_class": TransformerActorCritic}
+            model = PPO.load(model_path, env=env, device="cpu", custom_objects=custom_objects)
         elif model_type == "lstm":
+            if is_recurrent and RECURRENT_PPO_AVAILABLE:
+                # Try to load as RecurrentPPO first
+                try:
+                    model = RecurrentPPO.load(model_path, env=env, device="cpu")
+                    # Store that this is a recurrent model for later use
+                    model._is_recurrent = True
+                    return model, env
+                except Exception as e:
+                    st.warning(f"Failed to load as RecurrentPPO: {e}. Trying regular PPO...")
+            
+            # Fallback to regular PPO with SimpleLSTMPolicy
             custom_objects = {"policy_class": SimpleLSTMPolicy}
+            model = PPO.load(model_path, env=env, device="cpu", custom_objects=custom_objects)
+            model._is_recurrent = False
         else:
             custom_objects = {}
+            model = PPO.load(model_path, env=env, device="cpu", custom_objects=custom_objects)
+            model._is_recurrent = False
             
-        model = PPO.load(model_path, env=env, device="cpu", custom_objects=custom_objects)
         return model, env
     except Exception as e:
         st.error(f"Error loading model: {e}")
@@ -281,6 +311,15 @@ def run_simulation(model, env, config: Dict[str, Any]) -> Dict[str, Any]:
     # Reset environment (no custom options)
     obs, info = env.reset()
 
+    # Initialize hidden states for RecurrentPPO models
+    if hasattr(model, "_is_recurrent") and model._is_recurrent and RECURRENT_PPO_AVAILABLE:
+        # For RecurrentPPO, we need to track hidden states
+        lstm_states = None
+        episode_starts = np.ones((1,), dtype=bool)
+    else:
+        lstm_states = None
+        episode_starts = None
+
     # Seed logs with initial state (so Start and Path render correctly)
     init_pos = info.get("drone_position", np.zeros(3))
     init_vel = info.get("drone_velocity", np.zeros(3))
@@ -359,7 +398,15 @@ def run_simulation(model, env, config: Dict[str, Any]) -> Dict[str, Any]:
             )
         else:
             # For RL policies
-            action, _ = model.predict(obs, deterministic=True)
+            if hasattr(model, "_is_recurrent") and model._is_recurrent and RECURRENT_PPO_AVAILABLE:
+                # For RecurrentPPO, maintain hidden states
+                action, lstm_states = model.predict(
+                    obs, state=lstm_states, episode_start=episode_starts, deterministic=True
+                )
+                episode_starts = np.array([False])  # Only first step is episode start
+            else:
+                # For regular PPO
+                action, _ = model.predict(obs, deterministic=True)
         
         # Step environment
         obs, reward, terminated, truncated, info = env.step(action)
@@ -468,7 +515,7 @@ def main():
     if model_type != "pid":
         default_ckpt = (
             "runs/student_distilled/final_model.zip" if model_type == "transformer"
-            else ("runs/baseline_lstm_quick/final_model.zip" if model_type == "lstm"
+            else ("runs/baseline_lstm_recurrent/final_model.zip" if model_type == "lstm"
                   else "runs/baseline_lstm/final_model.zip")
         )
         checkpoint = st.sidebar.text_input(

@@ -1,27 +1,40 @@
-# Minimal baseline LSTM config for quick offline retraining
-timesteps: 10000           # Much fewer steps for quick runs
+# RecurrentPPO LSTM baseline config for proper sequence handling
+timesteps: 50000           # Moderate training for testing
 env_id: FlyCraft-v0
-run_name: baseline_lstm_quick
+run_name: baseline_lstm_recurrent
 output_dir: runs
 seed: 11
-n_envs: 1                  # Single environment for less resource usage
+n_envs: 4                  # RecurrentPPO works well with fewer parallel envs
 
-policy: lstm
-policy_kwargs:
-  lstm_hidden: 128         # Smaller LSTM
-  lstm_layers: 1
-  dropout: 0.1
+# Use RecurrentPPO instead of regular PPO
+algorithm: RecurrentPPO
+policy: MlpLstmPolicy      # Built-in RecurrentPPO policy
+
+# RecurrentPPO-specific settings
+recurrent_kwargs:
+  lstm_hidden_size: 256    # LSTM hidden size
+  n_lstm_layers: 2         # Number of LSTM layers
+  shared_lstm: False       # Separate LSTMs for actor/critic
+  enable_critic_lstm: True # Enable LSTM for critic
 
 ppo_kwargs:
-  learning_rate: 3.0e-4    # Slightly higher for faster learning
-  n_steps: 64              # Shorter rollouts
-  batch_size: 32           # Smaller batch
+  learning_rate: 3.0e-4    # Standard learning rate
+  n_steps: 128             # Shorter sequences for LSTM
+  batch_size: 64           # Smaller batches for recurrent training
   n_epochs: 4              # Fewer epochs per update
   gamma: 0.99
   gae_lambda: 0.95
   ent_coef: 0.01
   vf_coef: 0.5
   clip_range: 0.2
+  max_grad_norm: 0.5
 
-save_freq: 2000
-eval_freq: 1000
+# Evaluation and saving
+save_freq: 5000
+eval_freq: 2500
+n_eval_episodes: 5
+
+# Metrics and logging
+log_metrics: true
+csv_logging: true
+tensorboard_logging: true
