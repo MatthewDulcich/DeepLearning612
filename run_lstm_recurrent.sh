@@ -47,10 +47,15 @@ echo "Wandb: $USE_WANDB"
 if [[ -f "train_lstm_recurrent.py" ]]; then
     echo "Using dedicated RecurrentPPO training script..."
     SCRIPT="train_lstm_recurrent.py"
-    ARGS="--config $CONFIG --seed $SEED"
+    ARGS="--config $CONFIG"
     
     if [[ "$USE_WANDB" == "true" ]]; then
         ARGS="$ARGS --wandb"
+    fi
+    
+    # Add seed if not using config
+    if [[ "$SEED" != "42" ]]; then
+        ARGS="$ARGS --seed $SEED"
     fi
 else
     echo "Using main training script with RecurrentPPO support..."
@@ -70,13 +75,27 @@ fi
 
 # Install dependencies if needed
 echo "Checking dependencies..."
+
+# Check for sb3-contrib
 python -c "import sb3_contrib" 2>/dev/null || {
     echo "Installing sb3-contrib..."
     pip install sb3-contrib
 }
 
+# Check for flycraft (Linux-specific)
 python -c "import flycraft" 2>/dev/null || {
-    echo "Warning: flycraft not found. Make sure it's properly installed."
+    echo "Warning: FlyCraft not found."
+    echo "FlyCraft requires Linux environment. On macOS, training will fail."
+    echo "To install FlyCraft on Linux:"
+    echo "  git clone https://github.com/flycraft-team/flycraft"
+    echo "  cd flycraft && pip install -e ."
+    
+    # Check if we're on macOS and should exit
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "Detected macOS - FlyCraft training not supported."
+        echo "Please run this script on a Linux system."
+        exit 1
+    fi
 }
 
 # Run training

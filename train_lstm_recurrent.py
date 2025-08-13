@@ -9,6 +9,7 @@ Usage:
 import argparse
 import csv
 import time
+import yaml
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
@@ -452,6 +453,10 @@ def train_recurrent_ppo(args):
 def main():
     parser = argparse.ArgumentParser(description="Train RecurrentPPO LSTM policy")
     
+    # Configuration file option
+    parser.add_argument("--config", type=str, default=None,
+                       help="YAML config file path (overrides individual args)")
+    
     # Training hyperparameters
     parser.add_argument("--total-timesteps", type=int, default=DEFAULT_HYPERPARAMS['total_timesteps'],
                        help="Total training timesteps")
@@ -487,6 +492,45 @@ def main():
                        help="Environment ID")
     
     args = parser.parse_args()
+    
+    # Load config file if provided
+    if args.config:
+        with open(args.config, 'r') as f:
+            config = yaml.safe_load(f)
+        
+        # Override args with config values
+        if 'timesteps' in config:
+            args.total_timesteps = config['timesteps']
+        if 'n_envs' in config:
+            args.n_envs = config['n_envs']
+        if 'env_id' in config:
+            args.env_id = config['env_id']
+        if 'save_freq' in config:
+            args.eval_every = config['save_freq']
+        if 'n_eval_episodes' in config:
+            args.n_eval_episodes = config['n_eval_episodes']
+        
+        # Override with recurrent_kwargs if present
+        if 'recurrent_kwargs' in config:
+            rk = config['recurrent_kwargs']
+            if 'lstm_hidden_size' in rk:
+                args.lstm_hidden = rk['lstm_hidden_size']
+            if 'n_lstm_layers' in rk:
+                args.lstm_layers = rk['n_lstm_layers']
+        
+        # Override with ppo_kwargs if present
+        if 'ppo_kwargs' in config:
+            pk = config['ppo_kwargs']
+            if 'learning_rate' in pk:
+                args.learning_rate = pk['learning_rate']
+            if 'n_steps' in pk:
+                args.n_steps = pk['n_steps']
+            if 'batch_size' in pk:
+                args.batch_size = pk['batch_size']
+            if 'n_epochs' in pk:
+                args.n_epochs = pk['n_epochs']
+        
+        print(f"Loaded config from {args.config}")
     
     # Validate n_steps is divisible by 16 for LSTM sequence handling
     if args.n_steps % 16 != 0:
