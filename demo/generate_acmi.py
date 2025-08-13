@@ -67,6 +67,25 @@ def main():
 
 
     # --- Minimal rollout and ACMI writer ---
+    def extract_pos_vel(obs, info):
+        # Try info first
+        pos = info.get("drone_position")
+        vel = info.get("drone_velocity")
+        if pos is not None and vel is not None:
+            return np.array(pos), np.array(vel)
+        # Try obs dict
+        if isinstance(obs, dict):
+            pos = obs.get("position")
+            vel = obs.get("velocity")
+            if pos is not None and vel is not None:
+                return np.array(pos), np.array(vel)
+        # Try obs as flat array: assume [x, y, z, vx, vy, vz, ...]
+        if isinstance(obs, (np.ndarray, list)) and len(obs) >= 6:
+            arr = np.array(obs)
+            return arr[:3], arr[3:6]
+        # Fallback: zeros
+        return np.zeros(3), np.zeros(3)
+
     def rollout_and_save_acmi(env, model, acmi_path, max_steps=1000):
         """Run a rollout and save trajectory as .acmi file. Returns (success, trajectory)."""
         obs, info = env.reset()
@@ -80,8 +99,7 @@ def main():
             else:
                 # PID controller
                 target_pos = info.get("target_position", np.zeros(3))
-                current_pos = info.get("drone_position", np.zeros(3))
-                current_vel = info.get("drone_velocity", np.zeros(3))
+                current_pos, current_vel = extract_pos_vel(obs, info)
                 current_time = t
                 action = model(
                     target_pos, current_pos, current_vel, current_time,
@@ -89,8 +107,7 @@ def main():
                     current_yaw=info.get("drone_yaw", 0.0)
                 )
             obs, reward, terminated, truncated, info = env.step(action)
-            pos = info.get("drone_position", np.zeros(3))
-            vel = info.get("drone_velocity", np.zeros(3))
+            pos, vel = extract_pos_vel(obs, info)
             trajectory.append((t, pos[0], pos[1], pos[2], vel[0], vel[1], vel[2]))
             t += dt
             if terminated or truncated:
