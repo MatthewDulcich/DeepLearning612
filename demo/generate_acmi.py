@@ -68,11 +68,12 @@ def main():
 
     # --- Minimal rollout and ACMI writer ---
     def rollout_and_save_acmi(env, model, acmi_path, max_steps=1000):
-        """Run a rollout and save trajectory as .acmi file."""
+        """Run a rollout and save trajectory as .acmi file. Returns (success, trajectory)."""
         obs, info = env.reset()
         trajectory = []
         t = 0.0
         dt = 0.05  # 20Hz default
+        success = False
         for step in range(max_steps):
             if hasattr(model, 'predict'):
                 action, _ = model.predict(obs, deterministic=True)
@@ -93,6 +94,8 @@ def main():
             trajectory.append((t, pos[0], pos[1], pos[2], vel[0], vel[1], vel[2]))
             t += dt
             if terminated or truncated:
+                # Check for success flag in info, or define your own success condition
+                success = info.get("is_success", False)
                 break
         # Write ACMI file
         with open(acmi_path, "w") as f:
@@ -109,12 +112,22 @@ def main():
             f.write("0,1,Type=UAV\n")
             f.write("0,1,Color=Blue\n")
             for t, x, y, z, vx, vy, vz in trajectory:
-                # Tacview expects longitude, latitude, altitude (meters), but we use x/y/z as placeholders
                 f.write(f"{t:.2f},1,T={x:.2f}|{y:.2f}|{z:.2f}|{vx:.2f}|{vy:.2f}|{vz:.2f}\n")
             f.write("0,RemoveObject,1\n")
         print(f"Saved ACMI file to: {acmi_path}")
+        return success
 
-    rollout_and_save_acmi(env, model, acmi_path, max_steps=config.get("max_steps", 1000))
+    # Minimal loop: keep running until success
+    attempt = 0
+    while True:
+        attempt += 1
+        acmi_path = save_dir / f"rollout_{args.algo}_attempt{attempt}.acmi"
+        success = rollout_and_save_acmi(env, model, acmi_path, max_steps=config.get("max_steps", 1000))
+        if success:
+            print(f"Success on attempt {attempt}!")
+            break
+        else:
+            print(f"Attempt {attempt} not successful, retrying...")
 
 if __name__ == "__main__":
     main()
