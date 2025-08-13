@@ -278,18 +278,8 @@ def run_simulation(model, env, config: Dict[str, Any]) -> Dict[str, Any]:
     Dict[str, Any]
         Simulation results
     """
-    # Reset environment with configured parameters
-    obs, info = env.reset(
-        options={
-            "terrain_id": config.get("terrain_id", 0),
-            "weather": {
-                "wind_speed": config.get("wind_speed", 0.0),
-                "wind_dir": config.get("wind_dir", 0.0),
-                "turbulence": config.get("turbulence", 0.0),
-            },
-            "obstacles": config.get("obstacles", "medium"),
-        }
-    )
+    # Reset environment (no custom options)
+    obs, info = env.reset()
 
     # Seed logs with initial state (so Start and Path render correctly)
     init_pos = info.get("drone_position", np.zeros(3))
@@ -476,62 +466,27 @@ def main():
     
     # Model checkpoint
     if model_type != "pid":
+        default_ckpt = (
+            "runs/student_distilled/final_model.zip" if model_type == "transformer"
+            else ("runs/baseline_lstm_quick/final_model.zip" if model_type == "lstm"
+                  else "runs/baseline_lstm/final_model.zip")
+        )
         checkpoint = st.sidebar.text_input(
             "Model Checkpoint",
-            "runs/student_distilled/final_model.zip" if model_type == "transformer" else "runs/baseline_lstm/final_model.zip",
+            default_ckpt,
             help="Path to model checkpoint"
         )
     else:
         checkpoint = None
-    
-    # Environment configuration
-    st.sidebar.subheader("Environment")
-    
-    terrain_id = st.sidebar.selectbox(
-        "Terrain",
-        [0, 1, 2, 3, 4],
-        index=0,
-        help="Select terrain type"
-    )
-    
-    wind_speed = st.sidebar.slider(
-        "Wind Speed (m/s)",
-        0.0, 8.0, 2.0,
-        help="Wind speed in meters per second"
-    )
-    
-    wind_dir = st.sidebar.slider(
-        "Wind Direction (deg)",
-        0.0, 360.0, 45.0,
-        help="Wind direction in degrees"
-    )
-    
-    turbulence = st.sidebar.slider(
-        "Turbulence",
-        0.0, 1.0, 0.2,
-        help="Turbulence intensity (0-1)"
-    )
-    
-    obstacles = st.sidebar.selectbox(
-        "Obstacles",
-        ["none", "easy", "medium", "hard"],
-        index=2,
-        help="Obstacle density and complexity"
-    )
     
     max_steps = st.sidebar.slider(
         "Max Steps",
         100, 1000, 500,
         help="Maximum simulation steps"
     )
-    
+
     # Create configuration dictionary
     config = {
-        "terrain_id": terrain_id,
-        "wind_speed": wind_speed,
-        "wind_dir": wind_dir,
-        "turbulence": turbulence,
-        "obstacles": obstacles,
         "max_steps": max_steps,
     }
     
