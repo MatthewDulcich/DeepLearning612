@@ -132,16 +132,15 @@ def create_trajectory_plot(positions: np.ndarray, reference: Optional[np.ndarray
     """
     fig = make_subplots(rows=1, cols=1, specs=[[{"type": "scatter3d"}]])
     
-    # Add drone trajectory
+    # Add drone trajectory (lines only, no markers)
     fig.add_trace(
         go.Scatter3d(
             x=positions[:, 0],
             y=positions[:, 1],
             z=positions[:, 2],
-            mode="lines+markers",
+            mode="lines",
             name="Drone Path",
             line=dict(color="blue", width=4),
-            marker=dict(size=3, color="blue"),
         )
     )
     
@@ -187,7 +186,7 @@ def create_trajectory_plot(positions: np.ndarray, reference: Optional[np.ndarray
             xaxis_title="X Position (m)",
             yaxis_title="Y Position (m)",
             zaxis_title="Z Position (m)",
-            aspectmode="cube",
+            aspectmode="data",
         ),
         margin=dict(l=0, r=0, b=0, t=30),
         legend=dict(x=0, y=1),
@@ -253,10 +252,11 @@ def display_metrics(metrics: Dict[str, float]) -> None:
                 status = "warning"
             elif name == "Vel Error (%)" and value > 15.0:
                 status = "warning"
-            
+
+            val_str = "∞" if (isinstance(value, float) and not np.isfinite(value)) else f"{value:.2f}"
             st.markdown(f"""
             <div class="metric-card">
-                <div class="metric-value {status}">{value:.2f}</div>
+                <div class="metric-value {status}">{val_str}</div>
                 <div class="metric-label">{name}</div>
             </div>
             """, unsafe_allow_html=True)
@@ -290,7 +290,11 @@ def run_simulation(model, env, config: Dict[str, Any]) -> Dict[str, Any]:
             "obstacles": config.get("obstacles", "medium"),
         }
     )
-    
+
+    # Seed logs with initial state (so Start and Path render correctly)
+    init_pos = info.get("drone_position", np.zeros(3))
+    init_vel = info.get("drone_velocity", np.zeros(3))
+
     # Prepare result storage
     results = {
         "frames": [],
@@ -303,9 +307,42 @@ def run_simulation(model, env, config: Dict[str, Any]) -> Dict[str, Any]:
         "vel_error": [],
         "attention": [] if hasattr(model, "policy") and hasattr(model.policy, "get_attention_weights") else None,
     }
-    
-    # Get reference trajectory if available
+
+    # Log initial state as step 0
+    results["positions"].append(init_pos)
+    results["velocities"].append(init_vel)
+    # Placeholder action and reward at t=0
+    try:
+        zero_action = np.zeros(env.action_space.shape, dtype=np.float32)
+    except Exception:
+        zero_action = 0.0
+    results["actions"].append(zero_action)
+    results["rewards"].append(0.0)
+
+    # Initial metrics
+    if "obstacles" in info and len(info["obstacles"]) > 0:
+        ttc0, _ = time_to_collision(
+            init_pos,
+            init_vel,
+            info["obstacles"][0][0],
+            info["obstacles"][0][1],
+        )
+        results["ttc"].append(ttc0)
+    else:
+        results["ttc"].append(float("inf"))
+
     reference_trajectory = info.get("reference_trajectory", None)
+    if reference_trajectory is not None:
+        dev0, _ = path_deviation(np.array(results["positions"]), reference_trajectory[:1])
+        results["path_dev"].append(dev0)
+    else:
+        results["path_dev"].append(0.0)
+
+    if "target_velocity" in info:
+        vel_err0 = velocity_error(init_vel, info["target_velocity"], relative=True) * 100.0
+        results["vel_error"].append(vel_err0)
+    else:
+        results["vel_error"].append(0.0)
     
     # Run simulation
     done = False
