@@ -53,7 +53,16 @@ def main():
     parser.add_argument("--origin-lon", type=float, default=0.0, help="Reference longitude in degrees for flat-world export (spherical anchor).")
     parser.add_argument("--origin-lat", type=float, default=0.0, help="Reference latitude in degrees for flat-world export (spherical anchor).")
     parser.add_argument("--alt-offset", type=float, default=0.0, help="Meters to add to altitude when exporting (useful if sim Z=AGL).")
+    parser.add_argument("--spherical", action="store_true", help="Write T=Lon|Lat|Alt by converting local U,V meters to geographic coordinates around origin.")
     args = parser.parse_args()
+
+    # Helper: convert local flat U (east, m) / V (north, m) to lon/lat around origin
+    def _uv_to_lonlat(u_m, v_m, lon0_deg, lat0_deg):
+        R = 6378137.0  # WGS84 equatorial radius in meters
+        lat_rad = np.deg2rad(lat0_deg)
+        dlat_deg = (v_m / R) * (180.0 / np.pi)
+        dlon_deg = (u_m / (R * np.cos(lat_rad))) * (180.0 / np.pi)
+        return lon0_deg + dlon_deg, lat0_deg + dlat_deg
 
     # Load config (YAML)
     import yaml
@@ -177,18 +186,24 @@ def main():
                 # Initial frame and object creation with properties
                 f.write(f"#{first_t:.2f}\n")
                 f.write("1,Name=Drone,Type=Air+UAV,Color=Blue\n")
-                # Flat-world notation: T = Lon|Lat|Alt|U|V (meters for Alt/U/V)
-                f.write(
-                    f"1,T={args.origin_lon}|{args.origin_lat}|{z0 + args.alt_offset:.2f}|{x0:.2f}|{y0:.2f}\n"
-                )
+                alt0 = z0 + args.alt_offset
+                if args.spherical:
+                    lon0, lat0 = _uv_to_lonlat(x0, y0, args.origin_lon, args.origin_lat)
+                    # Spherical signature: Lon|Lat|Alt
+                    f.write(f"1,T={lon0:.6f}|{lat0:.6f}|{alt0:.2f}\n")
+                else:
+                    # Flat-world signature: Lon|Lat|Alt|U|V (U,V are meters)
+                    f.write(f"1,T={args.origin_lon}|{args.origin_lat}|{alt0:.2f}|{x0:.2f}|{y0:.2f}\n")
 
                 # Subsequent frames
                 for (t, x, y, z, vx, vy, vz) in trajectory[1:]:
                     f.write(f"#{t:.2f}\n")
-                    # Keep the same notation every time; provide full T for clarity
-                    f.write(
-                        f"1,T={args.origin_lon}|{args.origin_lat}|{z + args.alt_offset:.2f}|{x:.2f}|{y:.2f}\n"
-                    )
+                    alt = z + args.alt_offset
+                    if args.spherical:
+                        lon, lat = _uv_to_lonlat(x, y, args.origin_lon, args.origin_lat)
+                        f.write(f"1,T={lon:.6f}|{lat:.6f}|{alt:.2f}\n")
+                    else:
+                        f.write(f"1,T={args.origin_lon}|{args.origin_lat}|{alt:.2f}|{x:.2f}|{y:.2f}\n")
 
                 # Clean object removal at the end (instead of old RemoveObject command)
                 if trajectory:
