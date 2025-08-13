@@ -13,6 +13,13 @@ import os
 import gymnasium as gym
 import numpy as np
 
+# Try to import wrappers if available
+try:
+    from utils_my.sb3.my_wrappers import ScaledActionWrapper, ScaledObservationWrapper
+except ImportError:
+    ScaledActionWrapper = None
+    ScaledObservationWrapper = None
+
 from stable_baselines3 import PPO
 
 # Local imports
@@ -50,8 +57,12 @@ def main():
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
 
-    # Create environment
+    # Create environment with wrappers if available
     env = gym.make("FlyCraft", max_episode_steps=config.get("max_steps", 1000))
+    if ScaledObservationWrapper is not None:
+        env = ScaledObservationWrapper(env)
+    if ScaledActionWrapper is not None:
+        env = ScaledActionWrapper(env)
 
     # Load model
     if args.algo == "pid":
@@ -68,19 +79,55 @@ def main():
 
     # --- Minimal rollout and ACMI writer ---
     def extract_pos_vel(obs, info):
-        # Use achieved_goal as position if available
+        # 1. Try info dict
+        pos = info.get("drone_position")
+        vel = info.get("drone_velocity")
+        if pos is not None and vel is not None:
+            print(f"[DEBUG] Extracted from info: pos={pos}, vel={vel}")
+            return np.array(pos), np.array(vel)
+        # 2. Try obs dict
         if isinstance(obs, dict):
+            pos = obs.get("position")
+            vel = obs.get("velocity")
+            if pos is not None and vel is not None:
+                print(f"[DEBUG] Extracted from obs dict: pos={pos}, vel={vel}")
+                return np.array(pos), np.array(vel)
+            # Try achieved_goal/observation fallback
             pos = obs.get("achieved_goal")
             obs_arr = obs.get("observation")
-            if obs_arr is not None and len(obs_arr) >= 6:
+            if pos is not None and obs_arr is not None and len(obs_arr) >= 6:
                 vel = obs_arr[3:6]
-            else:
-                vel = np.zeros(3)
-            if pos is not None:
+                print(f"[DEBUG] Extracted from obs['achieved_goal'] and obs['observation']: pos={pos}, vel={vel}")
                 return np.array(pos), np.array(vel)
-        # fallback
+        # 3. Try flat obs array
+        if isinstance(obs, (np.ndarray, list)) and len(obs) >= 6:
+            arr = np.array(obs)
+            print(f"[DEBUG] Extracted from flat obs: pos={arr[:3]}, vel={arr[3:6]}")
+            return arr[:3], arr[3:6]
+        # 4. Fallback
+        print("[DEBUG] Could not extract pos/vel, returning zeros.")
         return np.zeros(3), np.zeros(3)
 
+        def extract_pos_vel(obs, info):
+            # Try info first
+            pos = info.get("drone_position")
+            vel = info.get("drone_velocity")
+            if pos is not None and vel is not None:
+                return np.array(pos), np.array(vel)
+            # Try obs dict
+            if isinstance(obs, dict):
+                pos = obs.get("position")
+                vel = obs.get("velocity")
+                if pos is not None and vel is not None:
+                    return np.array(pos), np.array(vel)
+            # Try obs as flat array: assume [x, y, z, vx, vy, vz, ...]
+            if isinstance(obs, (np.ndarray, list)) and len(obs) >= 6:
+                arr = np.array(obs)
+                # Print for debugging
+                print(f"[DEBUG] Flat obs: {arr}")
+                return arr[:3], arr[3:6]
+            # Fallback: zeros
+            return np.zeros(3), np.zeros(3)
     def rollout_and_save_acmi(env, model, max_steps=1000):
         """Run a rollout and save trajectory as .acmi file. Returns (success, trajectory)."""
         obs, info = env.reset()
@@ -104,6 +151,7 @@ def main():
                 )
             obs, reward, terminated, truncated, info = env.step(action)
             pos, vel = extract_pos_vel(obs, info)
+            print(f"[DEBUG] Step {step} pos: {pos}, vel: {vel}")
             trajectory.append((t, pos[0], pos[1], pos[2], vel[0], vel[1], vel[2]))
             t += dt
             if terminated or truncated:
