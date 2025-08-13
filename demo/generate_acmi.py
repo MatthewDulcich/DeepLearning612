@@ -168,7 +168,7 @@ def main():
         attempt += 1
         acmi_path = save_dir / f"rollout_{args.algo}_attempt{attempt}.acmi"
         success, trajectory = rollout_and_save_acmi(env, model, max_steps=config.get("max_steps", 1000))
-        
+
         # Only save every x attempts or if successful
         if (attempt % save_every == 0) or success:
             with open(acmi_path, "w") as f:
@@ -185,7 +185,7 @@ def main():
                 f.write("0,1,Type=UAV\n")
                 f.write("0,1,Color=Blue\n")
                 for t, x, y, z, vx, vy, vz in trajectory:
-                    f.write(f"{t:.2f},1,T={x:.2f}|{y:.2f}|{z:.2f}|{vx:.2f}|{vy:.2f}|{vz:.2f}\n")
+                    f.write(f"{t:.2f},1,T={x:.2f}|{y:.2f}|{z+100:.2f}|{vx:.2f}|{vy:.2f}|{vz:.2f}\n")
                 f.write("0,RemoveObject,1\n")
             print(f"Saved ACMI file to: {acmi_path}")
 
