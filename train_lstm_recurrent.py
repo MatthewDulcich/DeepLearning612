@@ -17,9 +17,32 @@ import numpy as np
 import gymnasium as gym
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
-from stable_baselines3.common.utils import linear_schedule
+
+# Try different import paths for linear_schedule (version compatibility)
+try:
+    from stable_baselines3.common.utils import linear_schedule
+    USE_SCHEDULE = True
+except ImportError:
+    try:
+        from stable_baselines3.common.schedule import linear_schedule
+        USE_SCHEDULE = True
+    except ImportError:
+        # Fallback: use constant learning rate
+        print("Warning: linear_schedule not available, using constant learning rate")
+        USE_SCHEDULE = False
+
 from sb3_contrib import RecurrentPPO
-from sb3_contrib.ppo_recurrent.policies import MlpLstmPolicy
+
+# Try different import paths for MlpLstmPolicy (version compatibility)
+try:
+    from sb3_contrib.ppo_recurrent.policies import MlpLstmPolicy
+except ImportError:
+    try:
+        from sb3_contrib.common.recurrent.policies import MlpLstmPolicy
+    except ImportError:
+        # Use string policy name as fallback
+        print("Warning: Could not import MlpLstmPolicy class, using string policy name")
+        MlpLstmPolicy = "MlpLstmPolicy"
 
 # Local imports
 import sys
@@ -364,6 +387,12 @@ def train_recurrent_ppo(args):
         "ortho_init": args.ortho_init,
     }
     
+    # Handle learning rate (with or without scheduling)
+    if USE_SCHEDULE:
+        learning_rate = linear_schedule(args.learning_rate)
+    else:
+        learning_rate = args.learning_rate
+    
     model = RecurrentPPO(
         MlpLstmPolicy,
         train_env,
@@ -375,7 +404,7 @@ def train_recurrent_ppo(args):
         clip_range=args.clip_range,
         vf_coef=args.vf_coef,
         ent_coef=args.ent_coef,
-        learning_rate=linear_schedule(args.learning_rate),
+        learning_rate=learning_rate,
         policy_kwargs=policy_kwargs,
         tensorboard_log=str(tb_log_dir),
         verbose=1,
