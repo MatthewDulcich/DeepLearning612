@@ -94,6 +94,7 @@ def main():
         dt = 0.05  # 20Hz default
         success = False
         for step in range(max_steps):
+            print(f"[DEBUG] Step {step} obs: {obs}")
             if hasattr(model, 'predict'):
                 action, _ = model.predict(obs, deterministic=True)
             else:
