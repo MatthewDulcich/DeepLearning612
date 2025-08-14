@@ -35,51 +35,97 @@ def load_model_with_compatibility(model_path: str, env, policy_class, device: st
     
     except Exception as e:
         error_str = str(e)
-        if "Unexpected key(s) in state_dict" in error_str or "state_predictor" in error_str:
-            print(f"Model contains deprecated components. Loading with compatibility mode...")
-            print(f"Original error: {e}")
+        print(f"Normal loading failed: {e}")
+        
+        # Handle various compatibility issues
+        if any(keyword in error_str for keyword in [
+            "Unexpected key(s) in state_dict", 
+            "state_predictor", 
+            "unexpected keyword argument 'n_envs'",
+            "LSTMFeatureExtractor",
+            "__init__() got an unexpected keyword argument"
+        ]):
+            print(f"Model contains incompatible components. Loading with compatibility mode...")
             
-            # Use a simpler approach: create model and manually load filtered state dict
+            # Create a patched policy class that handles old parameter signatures
+            patched_policy_class = create_compatible_policy_class(policy_class)
+            
             try:
-                # Create a fresh model instance with the current architecture
-                model = PPO(policy_class, env, device=device)
-                
-                # Load the saved model's state dict using torch directly
-                import zipfile
-                import io
-                
-                with zipfile.ZipFile(model_path, 'r') as zip_file:
-                    # Load policy state dict from the pytorch_variables.pth file
-                    try:
-                        with zip_file.open('policy.pth') as f:
-                            policy_state_dict = torch.load(io.BytesIO(f.read()), map_location=device)
-                    except KeyError:
-                        # Fallback: try pytorch_variables.pth (different SB3 versions)
-                        with zip_file.open('pytorch_variables.pth') as f:
-                            checkpoint = torch.load(io.BytesIO(f.read()), map_location=device)
-                            policy_state_dict = checkpoint
-                
-                # Filter out deprecated keys
-                filtered_state_dict = filter_state_dict_for_compatibility(policy_state_dict)
-                
-                # Load the filtered state dict with strict=False
-                missing_keys, unexpected_keys = model.policy.load_state_dict(filtered_state_dict, strict=False)
-                
-                if unexpected_keys:
-                    print(f"Ignored unexpected keys: {unexpected_keys}")
-                if missing_keys:
-                    print(f"Missing keys (will use random initialization): {missing_keys}")
-                
-                print("Model loaded successfully in compatibility mode")
-                return model
+                # Try with patched policy class
+                custom_objects = {"policy_class": patched_policy_class}
+                return PPO.load(model_path, env=env, device=device, custom_objects=custom_objects)
                 
             except Exception as inner_e:
-                print(f"Compatibility mode also failed: {inner_e}")
-                # Try even simpler approach - just load with strict=False
-                return load_with_strict_false(model_path, env, policy_class, device)
+                print(f"Patched policy loading failed: {inner_e}")
+                # Use manual state dict loading approach
+                return load_with_manual_state_dict(model_path, env, policy_class, device)
         else:
             # Re-raise if it's a different error
             raise e
+
+
+def create_compatible_policy_class(base_policy_class):
+    """Create a policy class that's compatible with old model signatures."""
+    
+    class CompatiblePolicy(base_policy_class):
+        def __init__(self, *args, **kwargs):
+            # Filter out any problematic kwargs that might come from old models
+            filtered_kwargs = {}
+            for key, value in kwargs.items():
+                # Skip problematic feature extractor kwargs
+                if key == "features_extractor_kwargs" and isinstance(value, dict):
+                    # Filter n_envs from feature extractor kwargs
+                    filtered_value = {k: v for k, v in value.items() if k != "n_envs"}
+                    filtered_kwargs[key] = filtered_value
+                else:
+                    filtered_kwargs[key] = value
+            
+            super().__init__(*args, **filtered_kwargs)
+    
+    return CompatiblePolicy
+
+
+def load_with_manual_state_dict(model_path: str, env, policy_class, device: str = "cpu") -> PPO:
+    """Load model by manually handling state dict loading."""
+    import zipfile
+    import io
+    
+    print("Attempting manual state dict loading...")
+    
+    try:
+        # Create a fresh model instance with the current architecture
+        model = PPO(policy_class, env, device=device)
+        
+        # Load the saved model's state dict using torch directly
+        with zipfile.ZipFile(model_path, 'r') as zip_file:
+            # Load policy state dict from the pytorch_variables.pth file
+            try:
+                with zip_file.open('policy.pth') as f:
+                    policy_state_dict = torch.load(io.BytesIO(f.read()), map_location=device)
+            except KeyError:
+                # Fallback: try pytorch_variables.pth (different SB3 versions)
+                with zip_file.open('pytorch_variables.pth') as f:
+                    checkpoint = torch.load(io.BytesIO(f.read()), map_location=device)
+                    policy_state_dict = checkpoint
+        
+        # Filter out deprecated keys
+        filtered_state_dict = filter_state_dict_for_compatibility(policy_state_dict)
+        
+        # Load the filtered state dict with strict=False
+        missing_keys, unexpected_keys = model.policy.load_state_dict(filtered_state_dict, strict=False)
+        
+        if unexpected_keys:
+            print(f"Ignored unexpected keys: {unexpected_keys}")
+        if missing_keys:
+            print(f"Missing keys (will use random initialization): {missing_keys}")
+        
+        print("Model loaded successfully with manual state dict loading")
+        return model
+        
+    except Exception as e:
+        print(f"Manual state dict loading failed: {e}")
+        # Try the strict=False fallback
+        return load_with_strict_false(model_path, env, policy_class, device)
 
 
 def load_with_strict_false(model_path: str, env, policy_class, device: str = "cpu") -> PPO:

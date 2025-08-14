@@ -329,6 +329,74 @@ def display_metrics(metrics: Dict[str, float]) -> None:
             </div>
             """, unsafe_allow_html=True)
 
+def display_metrics_explanation():
+    """Display detailed explanations of flight metrics."""
+    st.subheader("📊 Understanding Flight Metrics")
+    
+    with st.expander("Metric Explanations", expanded=False):
+        st.markdown("""
+        ### Time-to-Collision (TTC)
+        **What it measures:** The time in seconds until the drone would collide with the nearest obstacle if it continues on its current trajectory.
+        
+        - **Good values:** > 3 seconds (safe flight)
+        - **Warning values:** 1-3 seconds (caution needed)
+        - **Dangerous values:** < 1 second (immediate collision risk)
+        - **∞ (Infinity):** No collision detected on current path
+        
+        *This is a critical safety metric - the drone must maintain sufficient TTC to react to obstacles.*
+        
+        ### Path Deviation (Path Dev)
+        **What it measures:** The average distance in meters between the drone's actual flight path and the optimal reference trajectory.
+        
+        - **Excellent:** < 0.2m (very precise)
+        - **Good:** 0.2-0.5m (acceptable accuracy)
+        - **Poor:** > 0.5m (significant deviation)
+        
+        *Lower values indicate better trajectory following and navigation precision.*
+        
+        ### Velocity Error (Vel Error)
+        **What it measures:** The percentage difference between the drone's actual velocity and the desired target velocity.
+        
+        - **Excellent:** < 5% (very accurate speed control)
+        - **Good:** 5-15% (acceptable control)
+        - **Poor:** > 15% (poor speed management)
+        
+        *This measures how well the drone maintains the required flight speed.*
+        
+        ### Average Reward
+        **What it measures:** The mean reward signal from the reinforcement learning environment, indicating overall mission performance.
+        
+        - **High positive:** Mission objectives being met
+        - **Near zero:** Mediocre performance
+        - **Negative:** Poor performance, missing objectives
+        
+        *Higher rewards indicate better overall flight performance and objective completion.*
+        
+        ### Success Rate
+        **What it measures:** Whether the drone successfully completed its navigation mission without crashing or failing.
+        
+        - ✅ **Success:** Mission completed safely
+        - ❌ **Failure:** Crashed, exceeded time limit, or failed to reach target
+        
+        *This is the ultimate measure of mission effectiveness.*
+        """)
+        
+        st.markdown("""
+        ---
+        ### Flight Patterns Analysis
+        
+        The **Action Analysis** section shows:
+        - **Actions Over Time:** How the drone's control inputs (thrust, pitch, yaw) change during flight
+        - **Action Statistics:** Which movement axes the drone uses most/least
+        - **Movement Efficiency:** How direct the drone's path is compared to optimal
+        
+        The **3D Trajectory** visualization shows:
+        - 🔵 **Blue line:** Actual drone flight path
+        - 🟢 **Green dashed line:** Optimal reference trajectory (if available)
+        - 🟢 **Green dot:** Mission start point
+        - 🔴 **Red dot:** Mission end point
+        """)
+
 def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = None) -> Dict[str, Any]:
     """Run simulation with given model and configuration.
     
@@ -964,6 +1032,9 @@ def main():
                     "Avg Reward": np.mean(last_results["rewards"]),
                 }
                 display_metrics(metrics)
+                
+                # Add metrics explanation
+                display_metrics_explanation()
 
                 col1, col2 = st.columns(2)
                 with col1:
@@ -1206,6 +1277,9 @@ def main():
                     "Avg Reward": np.mean(results["rewards"]),
                 }
                 display_metrics(metrics)
+                
+                # Add metrics explanation
+                display_metrics_explanation()
                 
                 # Create visualization columns
                 col1, col2 = st.columns(2)

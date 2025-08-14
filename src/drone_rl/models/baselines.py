@@ -279,7 +279,8 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
         features_dim: int = 128,
         lstm_hidden: int = 256,
         num_layers: int = 2,
-        dropout: float = 0.1
+        dropout: float = 0.1,
+        **kwargs  # Accept any additional kwargs for compatibility
     ):
         """Initialize LSTM feature extractor.
         
@@ -295,8 +296,14 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
             Number of LSTM layers
         dropout : float
             Dropout probability between LSTM layers
+        **kwargs
+            Additional keyword arguments (ignored for compatibility)
         """
         super().__init__(observation_space, features_dim=features_dim)
+        
+        # Log any unexpected kwargs for debugging
+        if kwargs:
+            print(f"LSTMFeatureExtractor: Ignoring unexpected kwargs: {list(kwargs.keys())}")
         
         # Determine input size from observation space
         self.input_size = 0
@@ -305,6 +312,10 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
                 self.input_size += int(np.prod(space.shape))
             else:
                 raise ValueError(f"Unsupported observation space: {space}")
+        
+        # Store LSTM parameters
+        self.lstm_hidden = lstm_hidden
+        self.num_layers = num_layers
         
         # LSTM layers
         self.lstm = nn.LSTM(
@@ -316,13 +327,13 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
         )
         
         # Output projection
-        self.fc = nn.Sequential(
+        self.linear = nn.Sequential(
             nn.Linear(lstm_hidden, features_dim),
             nn.ReLU()
         )
         
         # Hidden state for recurrent processing
-        self.hidden = None
+        self._hidden_state = None
     
     def forward(self, observations: Dict[str, torch.Tensor]) -> torch.Tensor:
         """Process observations through LSTM.
@@ -337,44 +348,61 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
         torch.Tensor
             Extracted features
         """
-        # Flatten and concatenate all observation components
-        features = []
-        for k in sorted(observations.keys()):
-            obs = observations[k]
-            if len(obs.shape) > 3:  # Handle image-like observations
-                b, seq, *spatial = obs.shape
-                obs = obs.reshape(b, seq, -1)
-            features.append(obs)
-        
-        x = torch.cat(features, dim=-1)  # [batch_size, seq_len, input_size]
-        
-        # Process through LSTM
-        if self.hidden is None or x.size(0) != self.hidden[0].size(1):
-            # Initialize hidden state if needed
-            self.reset_hidden(batch_size=x.size(0), device=x.device)
-        
-        lstm_out, self.hidden = self.lstm(x, self.hidden)
-        
-        # Use last timestep output
-        last_output = lstm_out[:, -1]
-        
-        # Project to output dimension
-        return self.fc(last_output)
+        # Flatten dict obs to a single vector per sample
+        x = torch.cat([v.float().view(v.shape[0], -1) for v in observations.values()], dim=1)
+        # Add sequence dimension if missing (SB3 usually provides [batch, features])
+        if x.dim() == 2:
+            x = x.unsqueeze(1)  # [batch, seq=1, features]
+        batch_size = x.size(0)
+        device = x.device
+
+        # Use or expand hidden state buffer
+        if self._hidden_state is None or self._hidden_state[0].shape[1] != batch_size:
+            self.reset_hidden(n_envs=batch_size)
+        h, c = self._hidden_state
+        lstm_out, (h_new, c_new) = self.lstm(x, (h, c))  # lstm_out: [batch, seq, lstm_hidden]
+        self._hidden_state = (h_new.detach(), c_new.detach())
+        # Take the last output in the sequence
+        features = lstm_out[:, -1, :]
+        return self.linear(features)
     
-    def reset_hidden(self, batch_size: int = 1, device: torch.device = torch.device("cpu")) -> None:
-        """Reset LSTM hidden state.
+    def reset_hidden(self, n_envs: int = None, done_mask=None, device=None):
+        """Reset LSTM hidden states.
         
-        Parameters
-        ----------
-        batch_size : int
-            Batch size for hidden state
-        device : torch.device
-            Device for hidden state tensors
+        Args:
+            n_envs: Number of environments. If None, uses current batch size.
+            done_mask: Boolean mask indicating which environments are done.
+            device: Device to place tensors on.
         """
-        # Initialize hidden state (h0, c0)
-        h0 = torch.zeros(self.lstm.num_layers, batch_size, self.lstm.hidden_size, device=device)
-        c0 = torch.zeros(self.lstm.num_layers, batch_size, self.lstm.hidden_size, device=device)
-        self.hidden = (h0, c0)
+        if device is None:
+            device = next(self.parameters()).device
+        
+        # Debug info
+        if done_mask is not None:
+            print(f"Reset hidden: done_mask shape={np.array(done_mask).shape}, hidden_state shape={getattr(self._hidden_state[0], 'shape', None) if self._hidden_state else None}")
+        
+        if n_envs is not None:
+            # Init all
+            h = torch.zeros(self.num_layers, n_envs, self.lstm_hidden, device=device)
+            c = torch.zeros(self.num_layers, n_envs, self.lstm_hidden, device=device)
+            self._hidden_state = (h, c)
+        elif done_mask is not None:
+            # Only reset done envs - handle different done_mask shapes
+            done_mask = np.asarray(done_mask)
+            if done_mask.ndim == 0:
+                done_mask = [done_mask]
+            
+            # Ensure we don't exceed the hidden state dimensions
+            if self._hidden_state is not None:
+                max_envs = self._hidden_state[0].shape[1]
+                print(f"Reset hidden: max_envs={max_envs}, done_mask length={len(done_mask)}")
+                for idx, done in enumerate(done_mask):
+                    if done and idx < max_envs:
+                        self._hidden_state[0][:, idx].zero_()
+                        self._hidden_state[1][:, idx].zero_()
+            else:
+                # No hidden state initialized yet
+                print("Reset hidden: No hidden state to reset, skipping")
 
 
 class SimpleLSTMPolicy(ActorCriticPolicy):
