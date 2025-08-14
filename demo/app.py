@@ -38,6 +38,7 @@ except ImportError:
 from src.drone_rl.models.transformer_policy import TransformerActorCritic
 from src.drone_rl.models.baselines import SimpleLSTMPolicy, DronePositionController
 from src.drone_rl.utils.metrics import time_to_collision, path_deviation, velocity_error
+from src.drone_rl.utils.model_compatibility import load_model_with_compatibility
 from stable_baselines3 import PPO
 
 # Try to import RecurrentPPO for compatibility with new LSTM models
@@ -157,8 +158,7 @@ def load_model(model_path: str, model_type: str = "transformer"):
         
         # For transformer or LSTM, load from checkpoint
         if model_type == "transformer":
-            custom_objects = {"policy_class": TransformerActorCritic}
-            model = PPO.load(model_path, env=env, device="cpu", custom_objects=custom_objects)
+            model = load_model_with_compatibility(model_path, env, TransformerActorCritic, device="cpu")
         elif model_type == "lstm":
             if is_recurrent and RECURRENT_PPO_AVAILABLE:
                 # Try to load as RecurrentPPO first
@@ -171,8 +171,7 @@ def load_model(model_path: str, model_type: str = "transformer"):
                     st.warning(f"Failed to load as RecurrentPPO: {e}. Trying regular PPO...")
             
             # Fallback to regular PPO with SimpleLSTMPolicy
-            custom_objects = {"policy_class": SimpleLSTMPolicy}
-            model = PPO.load(model_path, env=env, device="cpu", custom_objects=custom_objects)
+            model = load_model_with_compatibility(model_path, env, SimpleLSTMPolicy, device="cpu")
             model._is_recurrent = False
         else:
             custom_objects = {}
