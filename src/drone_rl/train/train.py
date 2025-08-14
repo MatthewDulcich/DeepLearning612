@@ -74,6 +74,7 @@ def load_config(path: str | Path) -> Dict[str, Any]:
 
 def make_env(
     env_id: str,
+    env_config: Dict,
     seed: int,
     rank: int = 0,
     capture_video: bool = False,
@@ -85,7 +86,7 @@ def make_env(
             import flycraft  # noqa: F401
         except ImportError:
             pass
-        env = gym.make(env_id, max_episode_steps=max_episode_steps)
+        env = gym.make(env_id, custom_config=env_config, max_episode_steps=max_episode_steps)
         env.reset(seed=seed + rank)
 
         if capture_video and rank == 0 and run_dir is not None:
@@ -252,6 +253,7 @@ class StateSequencePredictor(nn.Module):
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train drone navigation policy")
     parser.add_argument("--config", required=True)
+    parser.add_argument("--env_config", required=True)
     parser.add_argument("--teacher", type=str, default=None)
     parser.add_argument("--sweep", type=int, default=None)
     parser.add_argument("--seed", type=int, default=None)
@@ -259,6 +261,9 @@ def main() -> None:
     parser.add_argument("--capture-video", action="store_true")
     parser.add_argument("--device", type=str, default=None)
     args = parser.parse_args()
+
+    # Load environment config (json to dict)
+    env_cfg = load_config(args.env_config)
 
     cfg = load_config(args.config)
     seed = args.seed if args.seed is not None else cfg.get("seed", 42)
@@ -286,7 +291,7 @@ def main() -> None:
         )
 
     # Vec envs + VecNormalize
-    env_fns = [make_env(env_id, seed, i, args.capture_video, run_dir, max_episode_steps) for i in range(n_envs)]
+    env_fns = [make_env(env_id, env_cfg, seed, i, args.capture_video, run_dir, max_episode_steps) for i in range(n_envs)]
     train_env = SubprocVecEnv(env_fns)
     train_env = VecMonitor(train_env)
     train_env = VecNormalize(
@@ -296,7 +301,7 @@ def main() -> None:
         gamma=cfg.get("ppo_kwargs", {}).get("gamma", 0.99),
     )
 
-    eval_env_fns = [make_env(env_id, seed + 1000, 0, args.capture_video, run_dir, max_episode_steps)]
+    eval_env_fns = [make_env(env_id, env_cfg, seed + 1000, 0, args.capture_video, run_dir, max_episode_steps)]
     eval_env = SubprocVecEnv(eval_env_fns)
     eval_env = VecMonitor(eval_env)
     eval_env = VecNormalize(
