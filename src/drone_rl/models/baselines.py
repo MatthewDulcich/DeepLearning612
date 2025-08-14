@@ -402,6 +402,8 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         
         # Initialize weights
         self.apply(self._weights_init)
+        # Ensure action_dist is properly initialized for custom head
+        self._build(lambda _: 1e-3)  # Use dummy lr_schedule; SB3 will override if needed
     
     @staticmethod
     def _weights_init(module: nn.Module) -> None:
@@ -488,9 +490,16 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
             Values, log probabilities, and entropy
         """
         features = self.extract_features(obs)
-        mean_actions = self.action_mean(features)
-        log_std = self.action_log_std.expand_as(mean_actions)
-        dist = self.action_dist.proba_distribution(mean_actions, log_std)
+        
+        # Handle both discrete and continuous actions
+        if isinstance(self.action_space, spaces.Discrete):
+            logits = self.action_net(features)
+            dist = self.action_dist.proba_distribution(action_logits=logits)
+        else:  # Continuous actions
+            mean_actions = self.action_mean(features)
+            log_std = self.action_log_std.expand_as(mean_actions)
+            dist = self.action_dist.proba_distribution(mean_actions, log_std)
+        
         log_prob = dist.log_prob(actions)
         # Always sum log_prob across action dim if needed (for any n_envs, action_dim)
         if log_prob.ndim > 1:
@@ -505,34 +514,3 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         """Reset LSTM hidden state between episodes or for done envs."""
         if hasattr(self.features_extractor, "reset_hidden"):
             self.features_extractor.reset_hidden(n_envs=n_envs, done_mask=done_mask)
-
-(drone-rl) mrdulcich@mrdulcich-SER:~/Desktop/DeepLearning612$ PYTHONPATH=src python src/drone_rl/train/train.py --config configs/baseline_lstm.yaml
-
-=== Training with step_frequency=10Hz ===
-load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
-load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
-load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
-load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
-load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
-load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
-load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
-load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
-load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
-/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/utils.py:195: UserWarning: get_linear_fn() is deprecated, please use LinearSchedule() instead
-  warnings.warn("get_linear_fn() is deprecated, please use LinearSchedule() instead")
-Using cpu device
-Logging to runs/baseline_lstm
-Traceback (most recent call last):
-  File "/home/mrdulcich/Desktop/DeepLearning612/src/drone_rl/train/train.py", line 593, in <module>
-    main()
-  File "/home/mrdulcich/Desktop/DeepLearning612/src/drone_rl/train/train.py", line 393, in main
-    model.learn(total_timesteps=timesteps, callback=callbacks)
-  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/ppo/ppo.py", line 311, in learn
-    return super().learn(
-  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/on_policy_algorithm.py", line 324, in learn
-    continue_training = self.collect_rollouts(self.env, callback, self.rollout_buffer, n_rollout_steps=self.n_steps)
-  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/on_policy_algorithm.py", line 247, in collect_rollouts
-    rollout_buffer.add(
-  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/buffers.py", line 797, in add
-    self.log_probs[self.pos] = log_prob.clone().cpu().numpy()
-ValueError: could not broadcast input array from shape (8,3) into shape (8,)
