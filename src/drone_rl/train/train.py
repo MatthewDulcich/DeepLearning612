@@ -23,6 +23,7 @@ from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv, VecMoni
 from drone_rl.models.transformer_policy import TransformerActorCritic
 from drone_rl.models.baselines import SimpleLSTMPolicy, DronePositionController  # optional
 from drone_rl.utils.metrics import count_parameters, estimate_flops
+from drone_rl.train.lstm_callback import LSTMResetCallback
 
 # wandb optional
 try:
@@ -386,6 +387,10 @@ def main() -> None:
             ),
             ModelComplexityCallback(),
         ]
+        
+        # Add LSTM reset callback if using LSTM policy
+        if policy_name == "lstm":
+            callbacks.append(LSTMResetCallback(verbose=1))
         if args.wandb and WANDB_AVAILABLE:
             callbacks.append(WandbCallback())
 
@@ -567,6 +572,10 @@ def main() -> None:
         ),
         ModelComplexityCallback(),
     ]
+    
+    # Add LSTM reset callback if using LSTM policy
+    if policy_name == "lstm":
+        callbacks.append(LSTMResetCallback(verbose=1))
 
     if cfg.get("predict_sequence", False):
         callbacks.append(
