@@ -514,3 +514,32 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         """Reset LSTM hidden state between episodes or for done envs."""
         if hasattr(self.features_extractor, "reset_hidden"):
             self.features_extractor.reset_hidden(n_envs=n_envs, done_mask=done_mask)
+load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
+/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/utils.py:195: UserWarning: get_linear_fn() is deprecated, please use LinearSchedule() instead
+  warnings.warn("get_linear_fn() is deprecated, please use LinearSchedule() instead")
+Using cpu device
+Logging to runs/baseline_lstm
+Traceback (most recent call last):
+  File "/home/mrdulcich/Desktop/DeepLearning612/src/drone_rl/train/train.py", line 593, in <module>
+    main()
+  File "/home/mrdulcich/Desktop/DeepLearning612/src/drone_rl/train/train.py", line 393, in main
+    model.learn(total_timesteps=timesteps, callback=callbacks)
+  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/ppo/ppo.py", line 311, in learn
+    return super().learn(
+  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/on_policy_algorithm.py", line 324, in learn
+    continue_training = self.collect_rollouts(self.env, callback, self.rollout_buffer, n_rollout_steps=self.n_steps)
+  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/on_policy_algorithm.py", line 202, in collect_rollouts
+    actions, values, log_probs = self.policy(obs_tensor)
+  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/mrdulcich/Desktop/DeepLearning612/src/drone_rl/models/baselines.py", line 455, in forward
+    values = self.value_net(features).flatten()
+  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/torch/nn/modules/linear.py", line 125, in forward
+    return F.linear(input, self.weight, self.bias)
+RuntimeError: mat1 and mat2 shapes cannot be multiplied (8x128 and 64x1)
