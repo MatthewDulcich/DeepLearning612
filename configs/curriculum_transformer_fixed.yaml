@@ -26,10 +26,10 @@ timesteps: 500000  # 10x more training time
 
 # More gradual curriculum progression
 curriculum_frequencies: [10, 20, 50, 100]
-success_threshold: 0.2  # LOWERED threshold to progress stages - CRITICAL FIX
+success_threshold: 0.2  # Lower threshold to progress stages
 n_eval_episodes: 20     # More evaluation episodes
 
-# Curriculum Learning Configuration - FIXED
+# Curriculum Learning Configuration - NOW WORKS WITH WRAPPER
 control_mode_by_freq:
   "10": guidance_law_mode
   "20": guidance_law_mode  

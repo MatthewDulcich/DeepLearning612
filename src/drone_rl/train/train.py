@@ -80,33 +80,54 @@ def make_env(
     capture_video: bool = False,
     run_dir: Optional[Path] = None,
     max_episode_steps: int = 1000,
-    # NEW curriculum args:
-    step_frequence: int = 10,
+    # Curriculum parameters (now handled by wrapper)
+    frequency: int = 10,
     control_mode: str = "guidance_law_mode",
-    reward_mode: str = "dense",
+    reward_mode: str = "dense", 
     goal_cfg: Optional[dict] = None,
-    debug: bool = False,  # NEW: Add debug wrapper option
+    debug: bool = False,
 ) -> Callable[[], gym.Env]:
     def _init() -> gym.Env:
         try:
             import flycraft  # noqa: F401
         except ImportError:
             pass
-        env = gym.make(
-            env_id,
-            max_episode_steps=max_episode_steps,
-            step_frequence=step_frequence,
-            control_mode=control_mode,
-            reward_mode=reward_mode,
-            goal_cfg=goal_cfg or {"type": "fixed_short", "distance_m": 200},
-        )
+        
+        # Create basic FlyCraft environment (only supports max_episode_steps)
+        try:
+            env = gym.make(env_id, max_episode_steps=max_episode_steps)
+            print(f"✅ Created {env_id} with max_episode_steps={max_episode_steps}")
+        except Exception as e:
+            print(f"⚠️  Failed to create {env_id} with max_episode_steps: {e}")
+            env = gym.make(env_id)
+            print(f"✅ Created {env_id} with default parameters")
+        
+        # Apply curriculum learning via wrapper
+        try:
+            from drone_rl.utils.curriculum_wrapper import FlyCraftCurriculumWrapper
+            env = FlyCraftCurriculumWrapper(
+                env=env,
+                frequency=frequency,
+                control_mode=control_mode,
+                reward_mode=reward_mode,
+                goal_cfg=goal_cfg or {"type": "fixed_short", "distance_m": 200},
+                verbose=(debug and rank == 0)
+            )
+            print(f"✅ Applied curriculum wrapper: {frequency}Hz, {reward_mode}, {control_mode}")
+        except ImportError as e:
+            print(f"⚠️  Curriculum wrapper not available: {e}")
+        
         env.reset(seed=seed + rank)
 
         # Add debug wrapper for first environment
         if debug and rank == 0:
-            from drone_rl.utils.flycraft_debug_wrapper import FlyCraftDebugWrapper, RewardAnalysisWrapper
-            env = FlyCraftDebugWrapper(env, verbose=True)
-            env = RewardAnalysisWrapper(env)
+            try:
+                from drone_rl.utils.flycraft_debug_wrapper import FlyCraftDebugWrapper, RewardAnalysisWrapper
+                env = FlyCraftDebugWrapper(env, verbose=True)
+                env = RewardAnalysisWrapper(env)
+                print("✅ Added debug wrappers")
+            except ImportError:
+                print("⚠️  Debug wrappers not available")
 
         if capture_video and rank == 0 and run_dir is not None:
             env = gym.wrappers.RecordVideo(env, str(run_dir / "videos"))
@@ -295,6 +316,7 @@ def main() -> None:
         reward_mode = cfg.get("reward_mode_by_freq", {}).get(str(freq), "dense")
         
         print(f"[Curriculum] Using: freq={freq}Hz, control_mode={control_mode}, reward_mode={reward_mode}, goal_cfg={goal_cfg}")
+        print(f"⚠️  NOTE: FlyCraft doesn't support curriculum parameters directly - using basic environment")
         
         # dirs
         output_dir = Path(cfg.get("output_dir", "runs"))
@@ -313,10 +335,10 @@ def main() -> None:
                 monitor_gym=True,
             )
 
-        # Vec envs + VecNormalize - now with curriculum args
+        # Vec envs + VecNormalize - now with curriculum wrapper
         env_fns = [make_env(
             env_id, seed, i, args.capture_video, run_dir, max_episode_steps,
-            step_frequence=freq,
+            frequency=freq,
             control_mode=control_mode,
             reward_mode=reward_mode,
             goal_cfg=goal_cfg,
@@ -334,7 +356,7 @@ def main() -> None:
 
         eval_env_fns = [make_env(
             env_id, seed + 1000, 0, args.capture_video, run_dir, max_episode_steps,
-            step_frequence=freq,
+            frequency=freq,
             control_mode=control_mode,
             reward_mode=reward_mode,
             goal_cfg=goal_cfg
