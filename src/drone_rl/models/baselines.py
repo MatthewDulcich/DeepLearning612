@@ -547,36 +547,3 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
             self.features_extractor.reset_hidden(n_envs=n_envs, done_mask=done_mask)
 
 
-# |    iterations      | 13       |
-# |    time_elapsed    | 86       |
-# |    total_timesteps | 106496   |
-# ---------------------------------
-# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 65。target: (246.85, 86.05, 115.03)。achieved target: (203.23, -16.15, -0.00)。expert steps: 0。
-# print, Train, crash_termination。 steps: 360。target: (127.92, -47.43, 28.71)。achieved target: (310.04, -30.75, 5.55)。expert steps: 0。
-# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 124。target: (100.30, -10.22, 164.66)。achieved target: (220.03, -29.58, 0.00)。expert steps: 0。
-# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 123。target: (275.02, -4.46, 122.34)。achieved target: (217.54, -29.09, 0.00)。expert steps: 0。
-# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 83。target: (141.21, 54.45, 127.48)。achieved target: (207.35, -20.39, -0.00)。expert steps: 0。
-# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 53。target: (201.89, 12.25, -7.98)。achieved target: (199.65, -13.35, 0.00)。expert steps: 0。
-# print, Train, crash_termination。 steps: 361。target: (254.40, -36.40, 0.14)。achieved target: (312.91, -38.42, 5.47)。expert steps: 0。
-# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 54。target: (100.35, -6.56, -18.22)。achieved target: (200.30, -13.64, 0.00)。expert steps: 0。
-# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 53。target: (130.60, 39.67, -21.15)。achieved target: (200.17, -13.31, 0.00)。expert steps: 0。
-# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 79。target: (157.01, 61.83, 91.20)。achieved target: (206.13, -19.40, -0.00)。expert steps: 0。
-# [Curriculum] step_frequency=10Hz, success_rate=0.00
-# [Curriculum] Stopping: success_rate 0.00 < threshold 0.8
-# /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/utils.py:195: UserWarning: get_linear_fn() is deprecated, please use LinearSchedule() instead
-#   warnings.warn("get_linear_fn() is deprecated, please use LinearSchedule() instead")
-# Using cpu device
-# Traceback (most recent call last):
-#   File "/home/mrdulcich/Desktop/DeepLearning612/src/drone_rl/train/train.py", line 593, in <module>
-#     main()
-#   File "/home/mrdulcich/Desktop/DeepLearning612/src/drone_rl/train/train.py", line 473, in main
-#     model = PPO(
-#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/ppo/ppo.py", line 171, in __init__
-#     self._setup_model()
-#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/ppo/ppo.py", line 174, in _setup_model
-#     super()._setup_model()
-#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/on_policy_algorithm.py", line 135, in _setup_model
-#     self.policy = self.policy_class(  # type: ignore[assignment]
-#   File "/home/mrdulcich/Desktop/DeepLearning612/src/drone_rl/models/baselines.py", line 386, in __init__
-#     super().__init__(*args, **kwargs)
-# TypeError: ActorCriticPolicy.__init__() got an unexpected keyword argument 'transformer_kwargs'
