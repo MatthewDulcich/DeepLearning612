@@ -758,7 +758,7 @@ def main():
                 with col1:
                     st.subheader("3D Trajectory")
                     traj_fig = create_trajectory_plot(last_results["positions"], last_results["reference_trajectory"])
-                    st.plotly_chart(traj_fig, use_container_width=True)
+                    st.plotly_chart(traj_fig, use_container_width=True, key="training_trajectory")
                 with col2:
                     st.subheader("Metrics Over Time")
                     metrics_df = pd.DataFrame({
@@ -774,7 +774,7 @@ def main():
                     fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Velocity Error (%)"], mode="lines", name="Vel Error (%)"))
                     fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Reward"], mode="lines", name="Reward"))
                     fig.update_layout(xaxis_title="Simulation Step", yaxis_title="Value", legend=dict(x=0, y=1, orientation="h"), margin=dict(l=0, r=0, b=0, t=30), height=400)
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, key="training_metrics")
 
                 if last_results.get("frames"):
                     st.subheader("Flight Video")
@@ -841,7 +841,7 @@ def main():
                         results["positions"],
                         results["reference_trajectory"]
                     )
-                    st.plotly_chart(trajectory_fig, use_container_width=True)
+                    st.plotly_chart(trajectory_fig, use_container_width=True, key="replay_trajectory")
                 
                 with col2:
                     # Display metrics over time
@@ -885,7 +885,7 @@ def main():
                         height=400,
                     )
                     
-                    st.plotly_chart(metrics_fig, use_container_width=True)
+                    st.plotly_chart(metrics_fig, use_container_width=True, key="replay_metrics")
                 
                 # Load and display video if available (optional)
                 if hasattr(rec, 'video_path') and rec.video_path and Path(rec.video_path).exists():
@@ -907,7 +907,7 @@ def main():
                 with col1:
                     st.subheader("3D Trajectory")
                     traj_fig = create_trajectory_plot(results["positions"], results["reference_trajectory"])
-                    st.plotly_chart(traj_fig, use_container_width=True)
+                    st.plotly_chart(traj_fig, use_container_width=True, key="live_trajectory")
                 with col2:
                     st.subheader("Metrics Over Time")
                     metrics_df = pd.DataFrame({
@@ -923,7 +923,7 @@ def main():
                     fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Velocity Error (%)"], mode="lines", name="Vel Error (%)"))
                     fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Reward"], mode="lines", name="Reward"))
                     fig.update_layout(xaxis_title="Simulation Step", yaxis_title="Value", legend=dict(x=0, y=1, orientation="h"), margin=dict(l=0, r=0, b=0, t=30), height=400)
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, key="live_metrics")
 
                 # If a saved MP4 exists, show it
                 if rec.video_path and os.path.exists(rec.video_path):
