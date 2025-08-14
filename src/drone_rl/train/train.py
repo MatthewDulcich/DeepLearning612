@@ -85,6 +85,7 @@ def make_env(
     control_mode: str = "guidance_law_mode",
     reward_mode: str = "dense",
     goal_cfg: Optional[dict] = None,
+    debug: bool = False,  # NEW: Add debug wrapper option
 ) -> Callable[[], gym.Env]:
     def _init() -> gym.Env:
         try:
@@ -101,16 +102,15 @@ def make_env(
         )
         env.reset(seed=seed + rank)
 
+        # Add debug wrapper for first environment
+        if debug and rank == 0:
+            from drone_rl.utils.flycraft_debug_wrapper import FlyCraftDebugWrapper, RewardAnalysisWrapper
+            env = FlyCraftDebugWrapper(env, verbose=True)
+            env = RewardAnalysisWrapper(env)
+
         if capture_video and rank == 0 and run_dir is not None:
-            from gymnasium.wrappers import RecordVideo
-            video_dir = run_dir / "videos"
-            video_dir.mkdir(exist_ok=True)
-            env = RecordVideo(
-                env,
-                video_dir,
-                episode_trigger=lambda ep: ep % 100 == 0,
-                name_prefix=f"{env_id.split('-')[0]}",
-            )
+            env = gym.wrappers.RecordVideo(env, str(run_dir / "videos"))
+
         return env
 
     return _init
@@ -319,7 +319,8 @@ def main() -> None:
             step_frequence=freq,
             control_mode=control_mode,
             reward_mode=reward_mode,
-            goal_cfg=goal_cfg
+            goal_cfg=goal_cfg,
+            debug=(i == 0)  # Enable debug wrapper for first env only
         ) for i in range(n_envs)]
         # Use DummyVecEnv instead of SubprocVecEnv to avoid multiprocessing issues
         train_env = DummyVecEnv(env_fns)
@@ -445,6 +446,22 @@ def main() -> None:
         success_rate = successes / n_eval
         curriculum_log.append({"step_frequency": freq, "success_rate": success_rate})
         print(f"[Curriculum] step_frequency={freq}Hz, success_rate={success_rate:.2f}")
+        
+        # ENHANCED DEBUGGING: Log detailed eval results
+        current_stage = step_frequencies.index(freq) + 1
+        total_stages = len(step_frequencies)
+        print(f"🔍 DETAILED EVALUATION RESULTS for {freq}Hz (Stage {current_stage}/{total_stages}):")
+        print(f"  - Episodes evaluated: {n_eval}")
+        print(f"  - Successful episodes: {successes}")
+        print(f"  - Success rate: {success_rate:.2%}")
+        print(f"  - Success threshold: {success_threshold:.2%}")
+        
+        # Log individual episode details if success rate is low
+        if success_rate < 0.3:
+            print("⚠️  LOW SUCCESS RATE - Debug info:")
+            print(f"   - Training timesteps: {timesteps}")
+            print(f"   - Reward mode: {reward_mode}")
+            print(f"   - Goal config: {goal_cfg}")
 
         # Save model and env
         model.save(run_dir / cfg.get("save_name", f"final_model_f{freq}"))
@@ -455,8 +472,18 @@ def main() -> None:
             wandb.finish()
 
         if success_rate < success_threshold:
-            print(f"[Curriculum] Stopping: success_rate {success_rate:.2f} < threshold {success_threshold}")
+            print(f"❌ [Curriculum] Stopping: success_rate {success_rate:.2f} < threshold {success_threshold}")
+            remaining_stages = total_stages - current_stage
+            print(f"   Failed at stage {current_stage}/{total_stages} ({remaining_stages} stages remaining)")
             break
+        else:
+            remaining_stages = total_stages - current_stage
+            if current_stage < total_stages:
+                next_freq = step_frequencies[current_stage] if current_stage < len(step_frequencies) else "FINAL"
+                print(f"✅ [Curriculum] SUCCESS! Advancing from {freq}Hz to {next_freq}Hz")
+                print(f"   ({remaining_stages} stages remaining)")
+            else:
+                print(f"🎉 [Curriculum] FINAL STAGE COMPLETED! Training successful at {freq}Hz")
 
     print(f"[Curriculum] Training completed. Log: {curriculum_log}")
 

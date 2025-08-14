@@ -1,0 +1,62 @@
+env_id: FlyCraft-v0
+eval_freq: 2500  # More frequent evaluation for debugging
+n_envs: 8
+output_dir: runs
+policy: transformer
+policy_kwargs:
+  embed_dim: 128  # Smaller model for faster convergence
+  num_heads: 4
+  num_layers: 2
+  dropout: 0.0    # No dropout initially
+ppo_kwargs:
+  batch_size: 256   # Smaller batch size
+  clip_range: 0.15  # More conservative clipping
+  gae_lambda: 0.95
+  gamma: 0.98       # Lower discount for more immediate rewards
+  learning_rate: 5e-5  # Much lower learning rate
+  n_epochs: 4       # Fewer epochs to prevent overfitting
+  n_steps: 256      # Shorter rollouts for faster feedback
+  ent_coef: 0.02    # Higher entropy for exploration
+  vf_coef: 0.8      # Higher value function learning
+  max_grad_norm: 0.5
+run_name: curriculum_transformer_fixed
+save_freq: 10000
+seed: 42
+timesteps: 500000  # 10x more training time
+
+# More gradual curriculum progression
+curriculum_frequencies: [10, 20, 50, 100]
+success_threshold: 0.2  # LOWERED threshold to progress stages - CRITICAL FIX
+n_eval_episodes: 20     # More evaluation episodes
+
+# Curriculum Learning Configuration - FIXED
+control_mode_by_freq:
+  "10": guidance_law_mode
+  "20": guidance_law_mode  
+  "50": guidance_law_mode
+  "100": guidance_law_mode
+
+# Keep dense rewards longer - CRITICAL FIX
+reward_mode_by_freq:
+  "10": dense
+  "20": dense
+  "50": dense        # Keep dense instead of dense_angle_only
+  "100": dense_angle_only
+
+# More reasonable goal progression - CRITICAL FIX
+goal_cfg_by_freq:
+  "10":
+    type: fixed_short
+    distance_m: 400    # Start farther away (was 200m)
+    heading_jitter_deg: 0  # No jitter initially
+  "20":
+    type: fixed_short
+    distance_m: 500    # Gradually increase
+    heading_jitter_deg: 5
+  "50":
+    type: bucket_short
+    distance_bins: [300, 500, 700]  # Reasonable distances
+  "100":
+    type: bucket_med
+    distance_bins: [400, 700, 1000]
+    yaw_bins: [-20, 20]  # Smaller angles initially
