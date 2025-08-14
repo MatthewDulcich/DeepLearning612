@@ -268,48 +268,155 @@ def main() -> None:
     n_envs = cfg.get("n_envs", 8)
     max_episode_steps = cfg.get("max_episode_steps", 1000)
 
-    # dirs
-    output_dir = Path(cfg.get("output_dir", "runs"))
-    run_name = cfg.get("run_name", f"{env_id.split('-')[0]}_{int(time.time())}")
-    run_dir = output_dir / run_name
-    run_dir.mkdir(parents=True, exist_ok=True)
-    with open(run_dir / "config.yaml", "w", encoding="utf-8") as f:
-        yaml.dump(cfg, f)
+    # Curriculum scheduler for step frequency
+    step_frequencies = [10, 20, 50, 100]
+    success_threshold = 0.8
+    curriculum_log = []
 
-    if args.wandb and WANDB_AVAILABLE:
-        wandb.init(
-            project=cfg.get("wandb_project", "drone-transformer-rl"),
-            name=run_name,
-            config=cfg,
-            sync_tensorboard=True,
-            monitor_gym=True,
+    for freq in step_frequencies:
+        print(f"\n=== Training with step_frequency={freq}Hz ===")
+        # dirs
+        output_dir = Path(cfg.get("output_dir", "runs"))
+        run_name = cfg.get("run_name", f"{env_id.split('-')[0]}_{int(time.time())}_f{freq}")
+        run_dir = output_dir / run_name
+        run_dir.mkdir(parents=True, exist_ok=True)
+        with open(run_dir / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(cfg, f)
+
+        if args.wandb and WANDB_AVAILABLE:
+            wandb.init(
+                project=cfg.get("wandb_project", "drone-transformer-rl"),
+                name=run_name,
+                config=cfg,
+                sync_tensorboard=True,
+                monitor_gym=True,
+            )
+
+        # Vec envs + VecNormalize
+        env_fns = [make_env(env_id, seed, i, args.capture_video, run_dir, max_episode_steps) for i in range(n_envs)]
+        train_env = SubprocVecEnv(env_fns)
+        train_env = VecMonitor(train_env)
+        train_env = VecNormalize(
+            train_env,
+            norm_obs=True,
+            norm_reward=True,
+            gamma=cfg.get("ppo_kwargs", {}).get("gamma", 0.99),
         )
 
-    # Vec envs + VecNormalize
-    env_fns = [make_env(env_id, seed, i, args.capture_video, run_dir, max_episode_steps) for i in range(n_envs)]
-    train_env = SubprocVecEnv(env_fns)
-    train_env = VecMonitor(train_env)
-    train_env = VecNormalize(
-        train_env,
-        norm_obs=True,
-        norm_reward=True,
-        gamma=cfg.get("ppo_kwargs", {}).get("gamma", 0.99),
-    )
+        eval_env_fns = [make_env(env_id, seed + 1000, 0, args.capture_video, run_dir, max_episode_steps)]
+        eval_env = SubprocVecEnv(eval_env_fns)
+        eval_env = VecMonitor(eval_env)
+        eval_env = VecNormalize(
+            eval_env,
+            norm_obs=True,
+            norm_reward=False,
+            training=False,
+            gamma=cfg.get("ppo_kwargs", {}).get("gamma", 0.99),
+        )
+        # share obs stats
+        eval_env.obs_rms = train_env.obs_rms
 
-    eval_env_fns = [make_env(env_id, seed + 1000, 0, args.capture_video, run_dir, max_episode_steps)]
-    eval_env = SubprocVecEnv(eval_env_fns)
-    eval_env = VecMonitor(eval_env)
-    eval_env = VecNormalize(
-        eval_env,
-        norm_obs=True,
-        norm_reward=False,
-        training=False,
-        gamma=cfg.get("ppo_kwargs", {}).get("gamma", 0.99),
-    )
-    # share obs stats
-    eval_env.obs_rms = train_env.obs_rms
+        device = args.device or ("cuda" if cuda_available() else "cpu")
 
-    device = args.device or ("cuda" if cuda_available() else "cpu")
+        # --------- policy/model setup (as before) ---------
+        policy_name = cfg.get("policy", "transformer")
+        if policy_name not in POLICIES:
+            raise ValueError(f"Unknown policy: {policy_name}. Available: {list(POLICIES.keys())}")
+        policy_cls = POLICIES[policy_name]
+        if policy_name == "transformer" and cfg.get("use_performer", False) and PERFORMER_AVAILABLE:
+            policy_cls = POLICIES["performer"]
+
+        policy_kwargs = cfg.get("policy_kwargs", {})
+        if isinstance(train_env.action_space, gym.spaces.Box):
+            policy_kwargs["log_std_init"] = -0.3
+        fx_kwargs = policy_kwargs.get("features_extractor_kwargs", {})
+        fx_kwargs.pop("use_spatio_temporal", None)
+        policy_kwargs["features_extractor_kwargs"] = fx_kwargs
+        policy_kwargs.setdefault("transformer_kwargs", {})
+        policy_kwargs["transformer_kwargs"].setdefault("attn_backend", "torch")
+
+        ppo_kwargs = cfg.get("ppo_kwargs", {})
+        ppo_kwargs.setdefault("verbose", 1)
+        ppo_kwargs.setdefault("device", device)
+        ppo_kwargs.setdefault("vf_coef", 1.0)
+        ppo_kwargs.setdefault("ent_coef", 0.01)
+        ppo_kwargs.setdefault("max_grad_norm", 0.5)
+        ppo_kwargs.setdefault("n_epochs", 2)
+        ppo_kwargs.setdefault("batch_size", 2048)
+        ppo_kwargs["learning_rate"] = get_linear_fn(1e-4, 5e-6, 1.0)
+        ppo_kwargs["clip_range"] = get_linear_fn(0.2, 0.1, 1.0)
+        ppo_kwargs["target_kl"] = None
+
+        model = PPO(
+            policy=policy_cls,
+            env=train_env,
+            tensorboard_log=str(run_dir / "tb"),
+            policy_kwargs=policy_kwargs,
+            **ppo_kwargs,
+        )
+
+        # logger
+        model.set_logger(configure(str(run_dir), ["stdout", "csv", "tensorboard"]))
+
+        # callbacks
+        save_freq = max(cfg.get("save_freq", 10000) // n_envs, 1)
+        eval_freq = max(cfg.get("eval_freq", 20000) // n_envs, 1)
+        callbacks: List[BaseCallback] = [
+            CheckpointCallback(
+                save_freq=save_freq,
+                save_path=str(run_dir / "checkpoints"),
+                name_prefix=run_name,
+                save_replay_buffer=False,
+                save_vecnormalize=True,
+            ),
+            EvalCallback(
+                eval_env,
+                best_model_save_path=str(run_dir),
+                log_path=str(run_dir / "eval"),
+                eval_freq=eval_freq,
+                n_eval_episodes=cfg.get("n_eval_episodes", 5),
+                deterministic=True,
+                render=args.capture_video,
+            ),
+            ModelComplexityCallback(),
+        ]
+        if args.wandb and WANDB_AVAILABLE:
+            callbacks.append(WandbCallback())
+
+        # train
+        timesteps = cfg.get("timesteps", 1_000_000)
+        model.learn(total_timesteps=timesteps, callback=callbacks)
+
+        # Evaluate success rate (using eval_env)
+        n_eval = 10
+        successes = 0
+        for _ in range(n_eval):
+            obs = eval_env.reset()
+            done = False
+            while not done:
+                action, _ = model.predict(obs, deterministic=True)
+                obs, reward, done, info = eval_env.step(action)
+                if isinstance(done, (list, np.ndarray)):
+                    done = done[0]
+                if done and (isinstance(info, list) and info[0].get("is_success", False)):
+                    successes += 1
+                elif done and (isinstance(info, dict) and info.get("is_success", False)):
+                    successes += 1
+        success_rate = successes / n_eval
+        curriculum_log.append({"step_frequency": freq, "success_rate": success_rate})
+        print(f"[Curriculum] step_frequency={freq}Hz, success_rate={success_rate:.2f}")
+
+        # Save model and env
+        model.save(run_dir / cfg.get("save_name", f"final_model_f{freq}"))
+        train_env.save(str(run_dir / f"vecnormalize_f{freq}.pkl"))
+        train_env.close()
+        eval_env.close()
+        if args.wandb and WANDB_AVAILABLE:
+            wandb.finish()
+
+        if success_rate < success_threshold:
+            print(f"[Curriculum] Stopping: success_rate {success_rate:.2f} < threshold {success_threshold}")
+            break
 
     # policy
     policy_name = cfg.get("policy", "transformer")
