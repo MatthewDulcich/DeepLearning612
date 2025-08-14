@@ -199,19 +199,6 @@ def create_trajectory_plot(positions: np.ndarray, reference: Optional[np.ndarray
     Figure
         Plotly figure with trajectory
     """
-    # Debug: Check the shape and content of positions
-    print(f"DEBUG: positions shape: {positions.shape}")
-    print(f"DEBUG: positions dtype: {positions.dtype}")
-    print(f"DEBUG: First few positions:\n{positions[:min(5, len(positions))]}")
-    print(f"DEBUG: Last few positions:\n{positions[-min(5, len(positions)):]}")
-    
-    # Check if all positions are the same (which would cause only endpoints to show)
-    if len(positions) > 1:
-        pos_diff = np.diff(positions, axis=0)
-        total_movement = np.sum(np.linalg.norm(pos_diff, axis=1))
-        print(f"DEBUG: Total movement distance: {total_movement}")
-        print(f"DEBUG: Position differences (first 3):\n{pos_diff[:3]}")
-    
     fig = make_subplots(rows=1, cols=1, specs=[[{"type": "scatter3d"}]])
     
     # Add drone trajectory (lines only, no markers)
@@ -387,18 +374,26 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
     
     # Debug: Check what's in the initial info and obs
     print(f"DEBUG: Initial info keys: {list(info.keys())}")
-    print(f"DEBUG: Initial obs shape: {obs.shape if hasattr(obs, 'shape') else type(obs)}")
+    print(f"DEBUG: Initial obs type: {type(obs)}")
+    if isinstance(obs, dict):
+        print(f"DEBUG: Initial obs keys: {list(obs.keys())}")
     print(f"DEBUG: Initial position from info: {init_pos}")
     
-    # Try to extract position from observation if not in info
-    if np.allclose(init_pos, 0) and hasattr(obs, 'shape') and len(obs.shape) == 1:
-        # For many flight envs, position is often the first 3 elements of obs
-        if obs.shape[0] >= 3:
-            potential_pos = obs[:3]
-            print(f"DEBUG: Potential position from obs[:3]: {potential_pos}")
-            if not np.allclose(potential_pos, 0):
-                init_pos = potential_pos
-                print(f"DEBUG: Using position from observation: {init_pos}")
+    # Try to extract position from plane_state in info
+    if np.allclose(init_pos, 0) and "plane_state" in info:
+        plane_state = info["plane_state"]
+        print(f"DEBUG: plane_state shape/type: {type(plane_state)}, {getattr(plane_state, 'shape', 'no shape')}")
+        if hasattr(plane_state, 'shape') and len(plane_state) >= 3:
+            # Position is typically the first 3 elements in plane state
+            init_pos = plane_state[:3]
+            print(f"DEBUG: Using position from plane_state: {init_pos}")
+    
+    # Try to extract from observation if available
+    elif np.allclose(init_pos, 0) and isinstance(obs, dict) and "plane_state" in obs:
+        plane_state = obs["plane_state"]
+        if hasattr(plane_state, 'shape') and len(plane_state) >= 3:
+            init_pos = plane_state[:3]
+            print(f"DEBUG: Using position from obs plane_state: {init_pos}")
 
     # Prepare result storage
     results = {
@@ -498,18 +493,31 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
                 print(f"DEBUG Step {step}: drone_position: {info['drone_position']}")
             else:
                 print(f"DEBUG Step {step}: drone_position not found in info")
-                print(f"DEBUG Step {step}: obs shape: {obs.shape if hasattr(obs, 'shape') else type(obs)}")
+                if isinstance(obs, dict):
+                    print(f"DEBUG Step {step}: obs keys: {list(obs.keys())}")
         
         drone_pos = info.get("drone_position", None)
         
-        # If drone_position not in info, try to extract from observation
+        # If drone_position not in info, try to extract from plane_state
         if drone_pos is None:
-            if hasattr(obs, 'shape') and len(obs.shape) == 1 and obs.shape[0] >= 3:
-                drone_pos = obs[:3]  # Position often first 3 elements
-                if step < 3:
-                    print(f"DEBUG Step {step}: Extracted position from obs: {drone_pos}")
-            else:
-                drone_pos = np.zeros(3)  # Fallback
+            # Check info first
+            if "plane_state" in info:
+                plane_state = info["plane_state"]
+                if hasattr(plane_state, 'shape') and len(plane_state) >= 3:
+                    drone_pos = plane_state[:3]
+                    if step < 3:
+                        print(f"DEBUG Step {step}: Extracted position from info plane_state: {drone_pos}")
+            # Check obs if still None
+            elif isinstance(obs, dict) and "plane_state" in obs:
+                plane_state = obs["plane_state"]
+                if hasattr(plane_state, 'shape') and len(plane_state) >= 3:
+                    drone_pos = plane_state[:3]
+                    if step < 3:
+                        print(f"DEBUG Step {step}: Extracted position from obs plane_state: {drone_pos}")
+            
+            # Fallback
+            if drone_pos is None:
+                drone_pos = np.zeros(3)
         
         results["positions"].append(drone_pos)
         results["velocities"].append(info.get("drone_velocity", np.zeros(3)))
@@ -949,36 +957,6 @@ def main():
                     
             except Exception as e:
                 st.error(f"Failed to load replay: {e}")
-        
-        # Live simulation mode (original functionality)
-        elif "model" in st.session_state and "env" in st.session_state and run_btn:
-
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.subheader("3D Trajectory")
-                    traj_fig = create_trajectory_plot(results["positions"], results["reference_trajectory"])
-                    st.plotly_chart(traj_fig, use_container_width=True, key="live_trajectory")
-                with col2:
-                    st.subheader("Metrics Over Time")
-                    metrics_df = pd.DataFrame({
-                        "Step": np.arange(len(results["ttc"])),
-                        "TTC (s)": np.clip(results["ttc"], 0, 10),
-                        "Path Deviation (m)": results["path_dev"],
-                        "Velocity Error (%)": results["vel_error"],
-                        "Reward": results["rewards"],
-                    })
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["TTC (s)"], mode="lines", name="TTC (s)"))
-                    fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Path Deviation (m)"], mode="lines", name="Path Dev (m)"))
-                    fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Velocity Error (%)"], mode="lines", name="Vel Error (%)"))
-                    fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Reward"], mode="lines", name="Reward"))
-                    fig.update_layout(xaxis_title="Simulation Step", yaxis_title="Value", legend=dict(x=0, y=1, orientation="h"), margin=dict(l=0, r=0, b=0, t=30), height=400)
-                    st.plotly_chart(fig, use_container_width=True, key="live_metrics")
-
-                # If a saved MP4 exists, show it
-                if rec.video_path and os.path.exists(rec.video_path):
-                    st.subheader("Flight Video (Saved)")
-                    st.video(rec.video_path)
 
     # Display instructions if no model loaded
     if "model" not in st.session_state:
@@ -1008,131 +986,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 35。target: (125.49, -77.36, -138.07)。achieved target: (223.63, -1.18, 0.37)。expert steps: 0。
-# DEBUG: Initial info keys: ['plane_state']
-# DEBUG: Initial obs shape: <class 'dict'>
-# DEBUG: Initial position from info: [0. 0. 0.]
-# DEBUG Step 0: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 0: drone_position not found in info
-# DEBUG Step 0: obs shape: <class 'dict'>
-# DEBUG Step 1: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 1: drone_position not found in info
-# DEBUG Step 1: obs shape: <class 'dict'>
-# DEBUG Step 2: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 2: drone_position not found in info
-# DEBUG Step 2: obs shape: <class 'dict'>
-# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 188。target: (271.64, -40.49, -26.30)。achieved target: (311.35, -3.93, 3.84)。expert steps: 0。
-# DEBUG: Initial info keys: ['plane_state']
-# DEBUG: Initial obs shape: <class 'dict'>
-# DEBUG: Initial position from info: [0. 0. 0.]
-# DEBUG Step 0: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 0: drone_position not found in info
-# DEBUG Step 0: obs shape: <class 'dict'>
-# DEBUG Step 1: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 1: drone_position not found in info
-# DEBUG Step 1: obs shape: <class 'dict'>
-# DEBUG Step 2: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 2: drone_position not found in info
-# DEBUG Step 2: obs shape: <class 'dict'>
-# print, Train, timeout_termination。 steps: 399。target: (214.62, 51.38, 21.77)。achieved target: (330.73, 16.24, 20.24)。expert steps: 0。
-# DEBUG: Initial info keys: ['plane_state']
-# DEBUG: Initial obs shape: <class 'dict'>
-# DEBUG: Initial position from info: [0. 0. 0.]
-# DEBUG Step 0: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 0: drone_position not found in info
-# DEBUG Step 0: obs shape: <class 'dict'>
-# DEBUG Step 1: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 1: drone_position not found in info
-# DEBUG Step 1: obs shape: <class 'dict'>
-# DEBUG Step 2: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 2: drone_position not found in info
-# DEBUG Step 2: obs shape: <class 'dict'>
-# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 35。target: (183.35, 14.05, -128.94)。achieved target: (224.51, -7.69, 0.04)。expert steps: 0。
-# DEBUG: Initial info keys: ['plane_state']
-# DEBUG: Initial obs shape: <class 'dict'>
-# DEBUG: Initial position from info: [0. 0. 0.]
-# DEBUG Step 0: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 0: drone_position not found in info
-# DEBUG Step 0: obs shape: <class 'dict'>
-# DEBUG Step 1: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 1: drone_position not found in info
-# DEBUG Step 1: obs shape: <class 'dict'>
-# DEBUG Step 2: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 2: drone_position not found in info
-# DEBUG Step 2: obs shape: <class 'dict'>
-# print, Train, timeout_termination。 steps: 399。target: (233.52, 21.84, 74.55)。achieved target: (332.35, 13.88, 13.68)。expert steps: 0。
-# DEBUG: Initial info keys: ['plane_state']
-# DEBUG: Initial obs shape: <class 'dict'>
-# DEBUG: Initial position from info: [0. 0. 0.]
-# DEBUG Step 0: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 0: drone_position not found in info
-# DEBUG Step 0: obs shape: <class 'dict'>
-# DEBUG Step 1: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 1: drone_position not found in info
-# DEBUG Step 1: obs shape: <class 'dict'>
-# DEBUG Step 2: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 2: drone_position not found in info
-# DEBUG Step 2: obs shape: <class 'dict'>
-# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 111。target: (247.26, 89.53, -179.34)。achieved target: (286.08, -22.01, 0.64)。expert steps: 0。
-# DEBUG: Initial info keys: ['plane_state']
-# DEBUG: Initial obs shape: <class 'dict'>
-# DEBUG: Initial position from info: [0. 0. 0.]
-# DEBUG Step 0: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 0: drone_position not found in info
-# DEBUG Step 0: obs shape: <class 'dict'>
-# DEBUG Step 1: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 1: drone_position not found in info
-# DEBUG Step 1: obs shape: <class 'dict'>
-# DEBUG Step 2: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
-# DEBUG Step 2: drone_position not found in info
-# DEBUG Step 2: obs shape: <class 'dict'>
-# print, Train, timeout_termination。 steps: 399。target: (104.46, -70.65, 53.22)。achieved target: (321.99, 14.49, 25.00)。expert steps: 0。
-# DEBUG: positions shape: (400, 3)
-# DEBUG: positions dtype: float64
-# DEBUG: First few positions:
-# [[0. 0. 0.]
-#  [0. 0. 0.]
-#  [0. 0. 0.]
-#  [0. 0. 0.]
-#  [0. 0. 0.]]
-# DEBUG: Last few positions:
-# [[0. 0. 0.]
-#  [0. 0. 0.]
-#  [0. 0. 0.]
-#  [0. 0. 0.]
-#  [0. 0. 0.]]
-# DEBUG: Total movement distance: 0.0
-# DEBUG: Position differences (first 3):
-# [[0. 0. 0.]
-#  [0. 0. 0.]
-#  [0. 0. 0.]]
-# DEBUG: positions shape: (400, 3)
-# DEBUG: positions dtype: float64
-# DEBUG: First few positions:
-# [[0. 0. 0.]
-#  [0. 0. 0.]
-#  [0. 0. 0.]
-#  [0. 0. 0.]
-#  [0. 0. 0.]]
-# DEBUG: Last few positions:
-# [[0. 0. 0.]
-#  [0. 0. 0.]
-#  [0. 0. 0.]
-#  [0. 0. 0.]
-#  [0. 0. 0.]]
-# DEBUG: Total movement distance: 0.0
-# DEBUG: Position differences (first 3):
-# [[0. 0. 0.]
-#  [0. 0. 0.]
-#  [0. 0. 0.]]
-# 2025-08-13 21:53:57.833 Uncaught app execution
-# Traceback (most recent call last):
-#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 128, in exec_func_with_error_handling
-#     result = func()
-#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 669, in code_to_exec
-#     exec(code, module.__dict__)  # noqa: S102
-#   File "/home/mrdulcich/Desktop/DeepLearning612/demo/app.py", line 1008, in <module>
-#     main()
-#   File "/home/mrdulcich/Desktop/DeepLearning612/demo/app.py", line 977, in main
-#     if rec.video_path and os.path.exists(rec.video_path):
-# UnboundLocalError: local variable 'rec' referenced before assignment
