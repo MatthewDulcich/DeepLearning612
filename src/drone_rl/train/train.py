@@ -332,8 +332,13 @@ def main() -> None:
         fx_kwargs = policy_kwargs.get("features_extractor_kwargs", {})
         fx_kwargs.pop("use_spatio_temporal", None)
         policy_kwargs["features_extractor_kwargs"] = fx_kwargs
-        policy_kwargs.setdefault("transformer_kwargs", {})
-        policy_kwargs["transformer_kwargs"].setdefault("attn_backend", "torch")
+
+        # Only merge transformer_kwargs for transformer/performer
+        merged_policy_kwargs = policy_kwargs
+        if policy_name in ["transformer", "performer"]:
+            transformer_kwargs = cfg.get("transformer_kwargs", {})
+            transformer_kwargs.setdefault("attn_backend", "torch")
+            merged_policy_kwargs = {**policy_kwargs, **transformer_kwargs}
 
         ppo_kwargs = cfg.get("ppo_kwargs", {})
         ppo_kwargs.setdefault("verbose", 1)
@@ -346,21 +351,6 @@ def main() -> None:
         ppo_kwargs["learning_rate"] = get_linear_fn(1e-4, 5e-6, 1.0)
         ppo_kwargs["clip_range"] = get_linear_fn(0.2, 0.1, 1.0)
         ppo_kwargs["target_kl"] = None
-
-        policy_name = cfg.get("policy", "transformer")
-
-        # Separate kwargs for each policy type
-        policy_kwargs = cfg.get("policy_kwargs", {})
-        transformer_kwargs = cfg.get("transformer_kwargs", {})
-
-        if policy_name == "transformer":
-            # Merge transformer-specific kwargs
-            merged_policy_kwargs = {**policy_kwargs, **transformer_kwargs}
-        elif policy_name == "lstm":
-            # Only use LSTM-relevant kwargs
-            merged_policy_kwargs = policy_kwargs
-        else:
-            merged_policy_kwargs = policy_kwargs
 
         model = PPO(
             policy=policy_cls,
