@@ -1016,3 +1016,29 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    
+# /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/gymnasium/envs/registration.py:527: UserWarning: WARN: Using the latest versioned environment `FlyCraft-v0` instead of the unversioned environment `FlyCraft`.
+#   logger.warn(
+# load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
+# Wrapping the env with a `Monitor` wrapper
+# Wrapping the env in a DummyVecEnv.
+# DEBUG: Initial info keys: ['plane_state']
+# DEBUG: Initial obs type: <class 'dict'>
+# DEBUG: Initial obs keys: ['observation', 'achieved_goal', 'desired_goal']
+# DEBUG: Initial position from info: [0. 0. 0.]
+# DEBUG: plane_state type: <class 'dict'>
+# DEBUG: plane_state length: 27
+# 2025-08-13 22:27:45.262 Uncaught app execution
+# Traceback (most recent call last):
+#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 128, in exec_func_with_error_handling
+#     result = func()
+#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 669, in code_to_exec
+#     exec(code, module.__dict__)  # noqa: S102
+#   File "/home/mrdulcich/Desktop/DeepLearning612/demo/app.py", line 1018, in <module>
+#     main()
+#   File "/home/mrdulcich/Desktop/DeepLearning612/demo/app.py", line 766, in main
+#     results = run_simulation(model, env, config, seed=seed)
+#   File "/home/mrdulcich/Desktop/DeepLearning612/demo/app.py", line 397, in run_simulation
+#     init_pos = np.array(plane_state[:3])
+# TypeError: unhashable type: 'slice'
