@@ -302,21 +302,43 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
         self._hidden_state = None
         self.reset_hidden(n_envs)
 
-    def reset_hidden(self, n_envs: int = None, done_mask: np.ndarray = None):
-        """Reset hidden state for all or only done envs."""
-        n_envs = n_envs or self.n_envs
-        device = next(self.lstm.parameters()).device
-        if self._hidden_state is None or self._hidden_state[0].shape[1] != n_envs:
+    def reset_hidden(self, n_envs: int = None, done_mask=None, device=None):
+        """Reset LSTM hidden states.
+        
+        Args:
+            n_envs: Number of environments. If None, uses current batch size.
+            done_mask: Boolean mask indicating which environments are done.
+            device: Device to place tensors on.
+        """
+        if device is None:
+            device = next(self.parameters()).device
+        
+        # Debug info
+        if done_mask is not None:
+            print(f"Reset hidden: done_mask shape={np.array(done_mask).shape}, hidden_state shape={getattr(self._hidden_state[0], 'shape', None) if self._hidden_state else None}")
+        
+        if n_envs is not None:
             # Init all
             h = torch.zeros(self.num_layers, n_envs, self.lstm_hidden, device=device)
             c = torch.zeros(self.num_layers, n_envs, self.lstm_hidden, device=device)
             self._hidden_state = (h, c)
         elif done_mask is not None:
-            # Only reset done envs
-            for idx, done in enumerate(done_mask):
-                if done:
-                    self._hidden_state[0][:, idx].zero_()
-                    self._hidden_state[1][:, idx].zero_()
+            # Only reset done envs - handle different done_mask shapes
+            done_mask = np.asarray(done_mask)
+            if done_mask.ndim == 0:
+                done_mask = [done_mask]
+            
+            # Ensure we don't exceed the hidden state dimensions
+            if self._hidden_state is not None:
+                max_envs = self._hidden_state[0].shape[1]
+                print(f"Reset hidden: max_envs={max_envs}, done_mask length={len(done_mask)}")
+                for idx, done in enumerate(done_mask):
+                    if done and idx < max_envs:
+                        self._hidden_state[0][:, idx].zero_()
+                        self._hidden_state[1][:, idx].zero_()
+            else:
+                # No hidden state initialized yet
+                print("Reset hidden: No hidden state to reset, skipping")
 
 
     def forward(self, observations: dict) -> torch.Tensor:

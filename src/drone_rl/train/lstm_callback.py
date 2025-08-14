@@ -26,6 +26,9 @@ class LSTMResetCallback(BaseCallback):
         
         if dones is not None and np.any(dones):
             # Reset hidden states for done environments
+            if self.verbose > 1:
+                print(f"LSTM Callback: dones shape={np.array(dones).shape}, dones={dones}")
+                
             if hasattr(self.model.policy, 'reset_hidden'):
                 self.model.policy.reset_hidden(done_mask=dones)
             elif hasattr(self.model.policy.features_extractor, 'reset_hidden'):
