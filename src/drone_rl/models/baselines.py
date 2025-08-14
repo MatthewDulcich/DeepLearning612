@@ -314,13 +314,14 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
             batch_first=True,
             dropout=dropout if num_layers > 1 else 0
         )
-        
-        # Output projection
+        # Layer normalization after LSTM
+        self.layer_norm = nn.LayerNorm(lstm_hidden)
+        # Output projection with dropout
         self.fc = nn.Sequential(
             nn.Linear(lstm_hidden, features_dim),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.Dropout(dropout)
         )
-        
         # Hidden state for recurrent processing
         self.hidden = None
     
@@ -337,27 +338,33 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
         torch.Tensor
             Extracted features
         """
-        # Flatten and concatenate all observation components
+        # Explicitly concatenate goal and achieved_goal first, then other obs
         features = []
+        for k in ["desired_goal", "achieved_goal"]:
+            if k in observations:
+                obs = observations[k]
+                if len(obs.shape) > 3:
+                    b, seq, *spatial = obs.shape
+                    obs = obs.reshape(b, seq, -1)
+                features.append(obs)
         for k in sorted(observations.keys()):
-            obs = observations[k]
-            if len(obs.shape) > 3:  # Handle image-like observations
-                b, seq, *spatial = obs.shape
-                obs = obs.reshape(b, seq, -1)
-            features.append(obs)
-        
+            if k not in ("desired_goal", "achieved_goal"):
+                obs = observations[k]
+                if len(obs.shape) > 3:
+                    b, seq, *spatial = obs.shape
+                    obs = obs.reshape(b, seq, -1)
+                features.append(obs)
         x = torch.cat(features, dim=-1)  # [batch_size, seq_len, input_size]
-        
+        # TODO: Add mask support for variable-length sequences
         # Process through LSTM
         if self.hidden is None or x.size(0) != self.hidden[0].size(1):
             # Initialize hidden state if needed
             self.reset_hidden(batch_size=x.size(0), device=x.device)
-        
         lstm_out, self.hidden = self.lstm(x, self.hidden)
-        
+        # Layer normalization
+        lstm_out = self.layer_norm(lstm_out)
         # Use last timestep output
         last_output = lstm_out[:, -1]
-        
         # Project to output dimension
         return self.fc(last_output)
     
@@ -425,7 +432,8 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         else:  # Continuous actions (Box)
             action_dim = int(np.prod(self.action_space.shape))
             self.action_mean = nn.Linear(self.features_dim, action_dim)
-            self.action_log_std = nn.Parameter(torch.zeros(action_dim))
+            # State-dependent log_std
+            self.action_log_std_layer = nn.Linear(self.features_dim, action_dim)
         
         # Value network
         self.value_net = nn.Sequential(
@@ -475,8 +483,9 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
             action_params = logits  # For discrete actions, logits are the params
         else:  # Continuous actions
             mean_actions = self.action_mean(features)
-            # Use state-independent log std
-            log_std = self.action_log_std.expand_as(mean_actions)
+            # State-dependent log std
+            log_std = self.action_log_std_layer(features)
+            log_std = torch.clamp(log_std, -5, 2)  # Clamp for stability
             dist = self.action_dist.proba_distribution(mean_actions, log_std)
             action_params = mean_actions  # For continuous actions, means are the params
         
@@ -532,7 +541,8 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
             dist = self.action_dist.proba_distribution(action_logits=logits)
         else:  # Continuous actions
             mean_actions = self.action_mean(features)
-            log_std = self.action_log_std.expand_as(mean_actions)
+            log_std = self.action_log_std_layer(features)
+            log_std = torch.clamp(log_std, -5, 2)
             dist = self.action_dist.proba_distribution(mean_actions, log_std)
         
         # Compute log probabilities and entropy
