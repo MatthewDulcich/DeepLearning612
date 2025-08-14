@@ -590,6 +590,8 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
 # Main application
 def main():
     """Main Streamlit application."""
+    rec = None  # Ensure rec is always defined
+
     st.title("🚁 Drone Transformer RL – Live Demo")
     st.markdown("""
     This demo showcases our transformer-based reinforcement learning approach for autonomous drone navigation.
@@ -1006,3 +1008,131 @@ def main():
 
 if __name__ == "__main__":
     main()
+# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 35。target: (125.49, -77.36, -138.07)。achieved target: (223.63, -1.18, 0.37)。expert steps: 0。
+# DEBUG: Initial info keys: ['plane_state']
+# DEBUG: Initial obs shape: <class 'dict'>
+# DEBUG: Initial position from info: [0. 0. 0.]
+# DEBUG Step 0: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 0: drone_position not found in info
+# DEBUG Step 0: obs shape: <class 'dict'>
+# DEBUG Step 1: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 1: drone_position not found in info
+# DEBUG Step 1: obs shape: <class 'dict'>
+# DEBUG Step 2: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 2: drone_position not found in info
+# DEBUG Step 2: obs shape: <class 'dict'>
+# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 188。target: (271.64, -40.49, -26.30)。achieved target: (311.35, -3.93, 3.84)。expert steps: 0。
+# DEBUG: Initial info keys: ['plane_state']
+# DEBUG: Initial obs shape: <class 'dict'>
+# DEBUG: Initial position from info: [0. 0. 0.]
+# DEBUG Step 0: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 0: drone_position not found in info
+# DEBUG Step 0: obs shape: <class 'dict'>
+# DEBUG Step 1: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 1: drone_position not found in info
+# DEBUG Step 1: obs shape: <class 'dict'>
+# DEBUG Step 2: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 2: drone_position not found in info
+# DEBUG Step 2: obs shape: <class 'dict'>
+# print, Train, timeout_termination。 steps: 399。target: (214.62, 51.38, 21.77)。achieved target: (330.73, 16.24, 20.24)。expert steps: 0。
+# DEBUG: Initial info keys: ['plane_state']
+# DEBUG: Initial obs shape: <class 'dict'>
+# DEBUG: Initial position from info: [0. 0. 0.]
+# DEBUG Step 0: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 0: drone_position not found in info
+# DEBUG Step 0: obs shape: <class 'dict'>
+# DEBUG Step 1: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 1: drone_position not found in info
+# DEBUG Step 1: obs shape: <class 'dict'>
+# DEBUG Step 2: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 2: drone_position not found in info
+# DEBUG Step 2: obs shape: <class 'dict'>
+# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 35。target: (183.35, 14.05, -128.94)。achieved target: (224.51, -7.69, 0.04)。expert steps: 0。
+# DEBUG: Initial info keys: ['plane_state']
+# DEBUG: Initial obs shape: <class 'dict'>
+# DEBUG: Initial position from info: [0. 0. 0.]
+# DEBUG Step 0: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 0: drone_position not found in info
+# DEBUG Step 0: obs shape: <class 'dict'>
+# DEBUG Step 1: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 1: drone_position not found in info
+# DEBUG Step 1: obs shape: <class 'dict'>
+# DEBUG Step 2: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 2: drone_position not found in info
+# DEBUG Step 2: obs shape: <class 'dict'>
+# print, Train, timeout_termination。 steps: 399。target: (233.52, 21.84, 74.55)。achieved target: (332.35, 13.88, 13.68)。expert steps: 0。
+# DEBUG: Initial info keys: ['plane_state']
+# DEBUG: Initial obs shape: <class 'dict'>
+# DEBUG: Initial position from info: [0. 0. 0.]
+# DEBUG Step 0: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 0: drone_position not found in info
+# DEBUG Step 0: obs shape: <class 'dict'>
+# DEBUG Step 1: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 1: drone_position not found in info
+# DEBUG Step 1: obs shape: <class 'dict'>
+# DEBUG Step 2: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 2: drone_position not found in info
+# DEBUG Step 2: obs shape: <class 'dict'>
+# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 111。target: (247.26, 89.53, -179.34)。achieved target: (286.08, -22.01, 0.64)。expert steps: 0。
+# DEBUG: Initial info keys: ['plane_state']
+# DEBUG: Initial obs shape: <class 'dict'>
+# DEBUG: Initial position from info: [0. 0. 0.]
+# DEBUG Step 0: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 0: drone_position not found in info
+# DEBUG Step 0: obs shape: <class 'dict'>
+# DEBUG Step 1: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 1: drone_position not found in info
+# DEBUG Step 1: obs shape: <class 'dict'>
+# DEBUG Step 2: info keys: ['step', 'is_success', 'rewards', 'action', 'desired_goal', 'plane_state', 'plane_next_state']
+# DEBUG Step 2: drone_position not found in info
+# DEBUG Step 2: obs shape: <class 'dict'>
+# print, Train, timeout_termination。 steps: 399。target: (104.46, -70.65, 53.22)。achieved target: (321.99, 14.49, 25.00)。expert steps: 0。
+# DEBUG: positions shape: (400, 3)
+# DEBUG: positions dtype: float64
+# DEBUG: First few positions:
+# [[0. 0. 0.]
+#  [0. 0. 0.]
+#  [0. 0. 0.]
+#  [0. 0. 0.]
+#  [0. 0. 0.]]
+# DEBUG: Last few positions:
+# [[0. 0. 0.]
+#  [0. 0. 0.]
+#  [0. 0. 0.]
+#  [0. 0. 0.]
+#  [0. 0. 0.]]
+# DEBUG: Total movement distance: 0.0
+# DEBUG: Position differences (first 3):
+# [[0. 0. 0.]
+#  [0. 0. 0.]
+#  [0. 0. 0.]]
+# DEBUG: positions shape: (400, 3)
+# DEBUG: positions dtype: float64
+# DEBUG: First few positions:
+# [[0. 0. 0.]
+#  [0. 0. 0.]
+#  [0. 0. 0.]
+#  [0. 0. 0.]
+#  [0. 0. 0.]]
+# DEBUG: Last few positions:
+# [[0. 0. 0.]
+#  [0. 0. 0.]
+#  [0. 0. 0.]
+#  [0. 0. 0.]
+#  [0. 0. 0.]]
+# DEBUG: Total movement distance: 0.0
+# DEBUG: Position differences (first 3):
+# [[0. 0. 0.]
+#  [0. 0. 0.]
+#  [0. 0. 0.]]
+# 2025-08-13 21:53:57.833 Uncaught app execution
+# Traceback (most recent call last):
+#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 128, in exec_func_with_error_handling
+#     result = func()
+#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 669, in code_to_exec
+#     exec(code, module.__dict__)  # noqa: S102
+#   File "/home/mrdulcich/Desktop/DeepLearning612/demo/app.py", line 1008, in <module>
+#     main()
+#   File "/home/mrdulcich/Desktop/DeepLearning612/demo/app.py", line 977, in main
+#     if rec.video_path and os.path.exists(rec.video_path):
+# UnboundLocalError: local variable 'rec' referenced before assignment
