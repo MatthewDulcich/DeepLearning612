@@ -403,9 +403,15 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         # Initialize weights
         self.apply(self._weights_init)
         
-        # Manually initialize action distribution (don't use _build as it overwrites networks)
+        # Manually initialize action distribution (replicate _build behavior without overwriting networks)
         from stable_baselines3.common.distributions import make_proba_distribution
         self.action_dist = make_proba_distribution(self.action_space)
+        
+        # Set up distribution parameters like _build() does
+        if hasattr(self.action_dist, "use_sde"):
+            self.action_dist.use_sde = False
+        if hasattr(self.action_dist, "log_std_init"):
+            self.action_dist.log_std_init = getattr(self, "log_std_init", 0.0)
     
     @staticmethod
     def _weights_init(module: nn.Module) -> None:
@@ -434,7 +440,7 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            Actions, values, and action parameters
+            Actions, values, and log probabilities
         """
         features = self.extract_features(obs)
         
@@ -453,10 +459,16 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         # Sample actions
         actions = dist.get_actions(deterministic=deterministic)
         
+        # Get log probabilities for the sampled actions
+        log_prob = dist.log_prob(actions)
+        # For continuous actions: ensure log_prob is summed to shape (n_envs,)
+        if isinstance(self.action_space, spaces.Box) and log_prob.ndim > 1:
+            log_prob = log_prob.sum(dim=-1)
+        
         # Compute values
         values = self.value_net(features).flatten()
         
-        return actions, values, action_params
+        return actions, values, log_prob
     
     def _predict(self, observation: Dict[str, torch.Tensor], deterministic: bool = False) -> torch.Tensor:
         """Predict action given observation.
@@ -503,12 +515,13 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
             dist = self.action_dist.proba_distribution(mean_actions, log_std)
         
         log_prob = dist.log_prob(actions)
-        # Always sum log_prob across action dim if needed (for any n_envs, action_dim)
-        if log_prob.ndim > 1:
-            log_prob = log_prob.sum(axis=-1)
+        # For continuous actions: ensure log_prob is summed to shape (n_envs,)
+        # For discrete actions: log_prob should already be shape (n_envs,)
+        if isinstance(self.action_space, spaces.Box) and log_prob.ndim > 1:
+            log_prob = log_prob.sum(dim=-1)
         entropy = dist.entropy()
-        if entropy.ndim > 1:
-            entropy = entropy.sum(axis=-1)
+        if isinstance(self.action_space, spaces.Box) and entropy.ndim > 1:
+            entropy = entropy.sum(dim=-1)
         values = self.value_net(features).flatten()
         return values, log_prob, entropy
     
