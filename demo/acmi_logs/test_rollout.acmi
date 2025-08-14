@@ -1,0 +1,18 @@
+FileType=text/acmi/tacview
+FileVersion=2.1
+0,ReferenceTime=2025-08-13T00:00:00Z
+0,Title=Test Flight
+0,Author=Copilot
+0,DataSource=Simulation
+0,Recorder=example.py
+0,
+0,AddObject,Aircraft,1
+0,1,Name=Drone
+0,1,Type=UAV
+0,1,Color=Blue
+0.00,1,T=1000.00|1000.00|500.00|10.00|0.00|0.00
+0.10,1,T=1010.00|1000.00|500.00|10.00|0.00|0.00
+0.20,1,T=1020.00|1000.00|500.00|10.00|0.00|0.00
+0.30,1,T=1030.00|1000.00|500.00|10.00|0.00|0.00
+0.40,1,T=1040.00|1000.00|500.00|10.00|0.00|0.00
+0,RemoveObject,1
