@@ -529,3 +529,65 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         """Reset LSTM hidden state between episodes or for done envs."""
         if hasattr(self.features_extractor, "reset_hidden"):
             self.features_extractor.reset_hidden(n_envs=n_envs, done_mask=done_mask)
+
+
+
+# (drone-rl) mrdulcich@mrdulcich-SER:~/Desktop/DeepLearning612$ PYTHONPATH=src python src/drone_rl/train/train.py --config configs/baseline_lstm.yaml
+
+# === Training with step_frequency=10Hz ===
+# load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
+# load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
+# load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
+# load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
+# load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
+# load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
+# load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
+# load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
+# load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
+# /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/utils.py:195: UserWarning: get_linear_fn() is deprecated, please use LinearSchedule() instead
+#   warnings.warn("get_linear_fn() is deprecated, please use LinearSchedule() instead")
+# Using cpu device
+# Logging to runs/baseline_lstm
+# print, Train, crash_termination。 steps: 348。target: (108.97, 12.89, -127.35)。achieved target: (230.07, -55.16, -0.76)。expert steps: 0。
+# print, Train, crash_termination。 steps: 354。target: (105.74, -63.37, 154.16)。achieved target: (236.94, -56.01, -2.16)。expert steps: 0。
+# print, Train, crash_termination。 steps: 361。target: (116.54, 84.56, 23.01)。achieved target: (258.41, -49.14, 1.71)。expert steps: 0。
+# print, Train, crash_termination。 steps: 368。target: (272.02, 25.44, 17.41)。achieved target: (227.23, -51.11, 0.87)。expert steps: 0。
+# print, Train, crash_termination。 steps: 373。target: (169.62, 21.87, -172.20)。achieved target: (238.17, -53.08, -0.43)。expert steps: 0。
+# print, Train, crash_termination。 steps: 375。target: (173.62, -51.31, -41.10)。achieved target: (243.91, -48.91, 0.97)。expert steps: 0。
+# print, Train, crash_termination。 steps: 380。target: (152.29, -76.10, 160.73)。achieved target: (270.38, -51.85, -0.69)。expert steps: 0。
+# print, Train, crash_termination。 steps: 382。target: (135.86, -27.02, -97.01)。achieved target: (231.77, -50.71, 2.53)。expert steps: 0。
+# print, Train, continuousely_move_away_termination_based_on_mu_error_and_chi_error。 steps: 79。target: (228.86, 13.84, -8.87)。achieved target: (219.70, -18.61, 0.06)。expert steps: 0。
+# print, Train, crash_termination。 steps: 368。target: (243.75, -27.84, -15.48)。achieved target: (232.85, -53.08, 2.21)。expert steps: 0。
+# print, Train, crash_termination。 steps: 373。target: (114.08, -66.64, 161.40)。achieved target: (264.46, -50.36, 1.19)。expert steps: 0。
+# print, Train, crash_termination。 steps: 365。target: (252.46, 38.94, -11.82)。achieved target: (230.35, -53.56, 2.89)。expert steps: 0。
+# print, Train, crash_termination。 steps: 372。target: (274.93, 63.73, -164.05)。achieved target: (241.35, -52.05, 2.71)。expert steps: 0。
+# print, Train, crash_termination。 steps: 378。target: (222.76, -89.53, 147.75)。achieved target: (236.03, -55.39, -0.02)。expert steps: 0。
+# print, Train, timeout_termination。 steps: 399。target: (185.63, 20.04, 85.10)。achieved target: (226.36, -45.14, 0.29)。expert steps: 0。
+# print, Train, timeout_termination。 steps: 399。target: (234.09, -69.29, 142.67)。achieved target: (226.08, -50.30, 2.01)。expert steps: 0。
+# print, Train, crash_termination。 steps: 376。target: (124.48, -33.55, 85.04)。achieved target: (246.89, -57.52, 0.19)。expert steps: 0。
+# Traceback (most recent call last):
+#   File "/home/mrdulcich/Desktop/DeepLearning612/src/drone_rl/train/train.py", line 593, in <module>
+#     main()
+#   File "/home/mrdulcich/Desktop/DeepLearning612/src/drone_rl/train/train.py", line 393, in main
+#     model.learn(total_timesteps=timesteps, callback=callbacks)
+#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/ppo/ppo.py", line 311, in learn
+#     return super().learn(
+#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/on_policy_algorithm.py", line 324, in learn
+#     continue_training = self.collect_rollouts(self.env, callback, self.rollout_buffer, n_rollout_steps=self.n_steps)
+#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/on_policy_algorithm.py", line 260, in collect_rollouts
+#     values = self.policy.predict_values(obs_as_tensor(new_obs, self.device))  # type: ignore[arg-type]
+#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/policies.py", line 763, in predict_values
+#     return self.value_net(latent_vf)
+#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+#     return self._call_impl(*args, **kwargs)
+#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+#     return forward_call(*args, **kwargs)
+#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/torch/nn/modules/container.py", line 240, in forward
+#     input = module(input)
+#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+#     return self._call_impl(*args, **kwargs)
+#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+#     return forward_call(*args, **kwargs)
+#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/torch/nn/modules/linear.py", line 125, in forward
+#     return F.linear(input, self.weight, self.bias)
+# RuntimeError: mat1 and mat2 shapes cannot be multiplied (8x64 and 128x128)
