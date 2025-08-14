@@ -1,0 +1,36 @@
+env_id: FlyCraft-v0
+eval_freq: 20000
+max_episode_steps: 1000
+n_envs: 16
+n_eval_episodes: 10
+output_dir: runs
+policy: transformer
+policy_kwargs:
+  log_std_init: -1.5
+  transformer_kwargs:
+    depth: 8
+    dropout: 0.1
+    embed_dim: 512
+    memory_size: 128
+    num_heads: 16
+    proj_out_dim: 256
+ppo_kwargs:
+  batch_size: 64
+  clip_range: 0.25
+  clip_range_vf: 0.2
+  ent_coef: 0.02
+  gae_lambda: 0.9
+  gamma: 0.95
+  learning_rate: 0.001
+  max_grad_norm: 0.5
+  n_epochs: 4
+  n_steps: 256
+  target_kl: null
+  vf_coef: 0.5
+predict_sequence: true
+prediction_horizon: 200
+run_name: teacher_large_easy_ppo
+save_freq: 50000
+seed: 42
+timesteps: 5000000
+use_spatio_temporal: true
