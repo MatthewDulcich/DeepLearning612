@@ -450,9 +450,15 @@ def main() -> None:
     # clean feature-extractor kwargs
     fx_kwargs = policy_kwargs.get("features_extractor_kwargs", {})
     fx_kwargs.pop("use_spatio_temporal", None)
+    # Add n_envs for LSTM policies
+    if policy_name == "lstm":
+        fx_kwargs["n_envs"] = n_envs
     policy_kwargs["features_extractor_kwargs"] = fx_kwargs
-    policy_kwargs.setdefault("transformer_kwargs", {})
-    policy_kwargs["transformer_kwargs"].setdefault("attn_backend", "torch")
+    
+    # Only add transformer_kwargs for transformer/performer policies
+    if policy_name in ["transformer", "performer"]:
+        policy_kwargs.setdefault("transformer_kwargs", {})
+        policy_kwargs["transformer_kwargs"].setdefault("attn_backend", "torch")
 
     # --------- PPO KWARGS ---------
     ppo_kwargs = cfg.get("ppo_kwargs", {})
