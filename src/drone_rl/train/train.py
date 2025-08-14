@@ -347,11 +347,26 @@ def main() -> None:
         ppo_kwargs["clip_range"] = get_linear_fn(0.2, 0.1, 1.0)
         ppo_kwargs["target_kl"] = None
 
+        policy_name = cfg.get("policy", "transformer")
+
+        # Separate kwargs for each policy type
+        policy_kwargs = cfg.get("policy_kwargs", {})
+        transformer_kwargs = cfg.get("transformer_kwargs", {})
+
+        if policy_name == "transformer":
+            # Merge transformer-specific kwargs
+            merged_policy_kwargs = {**policy_kwargs, **transformer_kwargs}
+        elif policy_name == "lstm":
+            # Only use LSTM-relevant kwargs
+            merged_policy_kwargs = policy_kwargs
+        else:
+            merged_policy_kwargs = policy_kwargs
+
         model = PPO(
             policy=policy_cls,
             env=train_env,
             tensorboard_log=str(run_dir / "tb"),
-            policy_kwargs=policy_kwargs,
+            policy_kwargs=merged_policy_kwargs,
             **ppo_kwargs,
         )
 
