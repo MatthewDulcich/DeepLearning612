@@ -34,70 +34,86 @@ def load_model_with_compatibility(model_path: str, env, policy_class, device: st
         return PPO.load(model_path, env=env, device=device, custom_objects=custom_objects)
     
     except Exception as e:
-        if "Unexpected key(s) in state_dict" in str(e) or "state_predictor" in str(e):
-            warnings.warn(
-                f"Model contains deprecated components. Loading with compatibility mode.\n"
-                f"Original error: {e}"
-            )
+        error_str = str(e)
+        if "Unexpected key(s) in state_dict" in error_str or "state_predictor" in error_str:
+            print(f"Model contains deprecated components. Loading with compatibility mode...")
+            print(f"Original error: {e}")
             
-            # Load manually with filtering
-            import zipfile
-            import pickle
-            import tempfile
-            import os
-            
-            # Extract and modify the model data
-            with tempfile.TemporaryDirectory() as temp_dir:
-                # Extract the zip file
+            # Use a simpler approach: create model and manually load filtered state dict
+            try:
+                # Create a fresh model instance with the current architecture
+                model = PPO(policy_class, env, device=device)
+                
+                # Load the saved model's state dict using torch directly
+                import zipfile
+                import io
+                
                 with zipfile.ZipFile(model_path, 'r') as zip_file:
-                    zip_file.extractall(temp_dir)
+                    # Load policy state dict from the pytorch_variables.pth file
+                    try:
+                        with zip_file.open('policy.pth') as f:
+                            policy_state_dict = torch.load(io.BytesIO(f.read()), map_location=device)
+                    except KeyError:
+                        # Fallback: try pytorch_variables.pth (different SB3 versions)
+                        with zip_file.open('pytorch_variables.pth') as f:
+                            checkpoint = torch.load(io.BytesIO(f.read()), map_location=device)
+                            policy_state_dict = checkpoint
                 
-                # Load the data pickle
-                data_path = os.path.join(temp_dir, 'data')
-                with open(data_path, 'rb') as f:
-                    data = pickle.load(f)
+                # Filter out deprecated keys
+                filtered_state_dict = filter_state_dict_for_compatibility(policy_state_dict)
                 
-                # Filter out deprecated state_dict keys
-                if 'state_dict' in data:
-                    original_state_dict = data['state_dict']
-                    filtered_state_dict = {}
-                    
-                    deprecated_prefixes = [
-                        'policy.state_predictor',
-                        'state_predictor'
-                    ]
-                    
-                    for key, value in original_state_dict.items():
-                        # Skip deprecated keys
-                        if any(key.startswith(prefix) for prefix in deprecated_prefixes):
-                            continue
-                        filtered_state_dict[key] = value
-                    
-                    data['state_dict'] = filtered_state_dict
+                # Load the filtered state dict with strict=False
+                missing_keys, unexpected_keys = model.policy.load_state_dict(filtered_state_dict, strict=False)
                 
-                # Save the modified data
-                with open(data_path, 'wb') as f:
-                    pickle.dump(data, f)
-                
-                # Create a new zip file
-                temp_model_path = os.path.join(temp_dir, 'model_compatible.zip')
-                with zipfile.ZipFile(temp_model_path, 'w') as zip_file:
-                    for file_name in os.listdir(temp_dir):
-                        if file_name != 'model_compatible.zip':
-                            zip_file.write(
-                                os.path.join(temp_dir, file_name),
-                                file_name
-                            )
-                
-                # Load the compatible model
-                custom_objects = {"policy_class": policy_class}
-                model = PPO.load(temp_model_path, env=env, device=device, custom_objects=custom_objects)
+                if unexpected_keys:
+                    print(f"Ignored unexpected keys: {unexpected_keys}")
+                if missing_keys:
+                    print(f"Missing keys (will use random initialization): {missing_keys}")
                 
                 print("Model loaded successfully in compatibility mode")
                 return model
+                
+            except Exception as inner_e:
+                print(f"Compatibility mode also failed: {inner_e}")
+                # Try even simpler approach - just load with strict=False
+                return load_with_strict_false(model_path, env, policy_class, device)
         else:
             # Re-raise if it's a different error
             raise e
+
+
+def load_with_strict_false(model_path: str, env, policy_class, device: str = "cpu") -> PPO:
+    """Fallback loading method that uses strict=False during state dict loading."""
+    import zipfile
+    import pickle
+    import tempfile
+    import os
+    
+    print("Attempting fallback loading with strict=False...")
+    
+    # This is a more direct approach that modifies SB3's loading process
+    # by monkey-patching the load_state_dict method temporarily
+    original_load_state_dict = torch.nn.Module.load_state_dict
+    
+    def patched_load_state_dict(self, state_dict, strict=True):
+        # Force strict=False and filter deprecated keys
+        filtered_dict = filter_state_dict_for_compatibility(state_dict)
+        return original_load_state_dict(self, filtered_dict, strict=False)
+    
+    try:
+        # Temporarily patch the method
+        torch.nn.Module.load_state_dict = patched_load_state_dict
+        
+        # Now try loading normally
+        custom_objects = {"policy_class": policy_class}
+        model = PPO.load(model_path, env=env, device=device, custom_objects=custom_objects)
+        
+        print("Model loaded with fallback method")
+        return model
+        
+    finally:
+        # Always restore the original method
+        torch.nn.Module.load_state_dict = original_load_state_dict
 
 
 def filter_state_dict_for_compatibility(state_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
