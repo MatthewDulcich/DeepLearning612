@@ -391,8 +391,13 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
         # Handle dictionary plane_state
         if isinstance(plane_state, dict):
             print(f"DEBUG: plane_state keys: {list(plane_state.keys())}")
+            # Print first few key-value pairs to understand the structure
+            for i, (key, value) in enumerate(plane_state.items()):
+                if i < 10:  # Show first 10 key-value pairs
+                    print(f"DEBUG: {key}: {value} (type: {type(value).__name__})")
+            
             # Look for common position keys in FlyCraft
-            position_keys = ['x', 'y', 'z', 'pos_x', 'pos_y', 'pos_z', 'position']
+            position_keys = ['x', 'y', 'z', 'pos_x', 'pos_y', 'pos_z', 'position', 'lat', 'lon', 'alt', 'north', 'east', 'down']
             pos_values = []
             for key in position_keys:
                 if key in plane_state:
@@ -403,14 +408,20 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
                 init_pos = np.array(pos_values[:3])
                 print(f"DEBUG: Using position from plane_state dict: {init_pos}")
             else:
-                # Try to extract from first 3 values if they exist
+                # Try to extract from first 3 numeric values if they exist
                 values = list(plane_state.values())
-                if len(values) >= 3:
+                numeric_values = []
+                for val in values:
                     try:
-                        init_pos = np.array([float(v) for v in values[:3]])
-                        print(f"DEBUG: Using first 3 values from plane_state: {init_pos}")
+                        numeric_values.append(float(val))
                     except (ValueError, TypeError):
-                        print(f"DEBUG: Could not convert first 3 values to float")
+                        pass
+                
+                if len(numeric_values) >= 3:
+                    init_pos = np.array(numeric_values[:3])
+                    print(f"DEBUG: Using first 3 numeric values from plane_state: {init_pos}")
+                else:
+                    print(f"DEBUG: Could not extract position from plane_state dict")
         
         elif hasattr(plane_state, 'shape') and len(plane_state) >= 3:
             # Position is typically the first 3 elements in plane state
