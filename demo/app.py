@@ -23,6 +23,10 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import imageio
 import io
+import os
+import json
+import uuid
+from dataclasses import dataclass, asdict
 
 # Import local modules
 try:
@@ -57,6 +61,7 @@ st.set_page_config(
 )
 
 # Custom CSS for styling
+
 st.markdown("""
 <style>
     .metric-card {
@@ -84,6 +89,40 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+# --- Saved runs utilities ---
+SAVE_DIR = Path("demo/saved_runs")
+SAVE_DIR.mkdir(parents=True, exist_ok=True)
+
+@dataclass
+class RunRecord:
+    id: str
+    timestamp: float
+    model_type: str
+    model_path: str
+    config: dict
+    metrics: dict
+    positions: list
+    velocities: list
+    rewards: list
+    ttc: list
+    path_dev: list
+    vel_error: list
+    reference_trajectory: list | None
+    video_path: str | None
+
+def save_run(record: RunRecord) -> str:
+    run_dir = SAVE_DIR / record.id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    json_path = run_dir / "run.json"
+    with open(json_path, "w") as f:
+        json.dump(asdict(record), f)
+    return str(json_path)
+
+def load_run(json_path: str) -> RunRecord:
+    with open(json_path) as f:
+        data = json.load(f)
+    return RunRecord(**data)
 
 # Cache model loading to avoid reloading on every interaction
 @st.cache_resource
@@ -291,7 +330,7 @@ def display_metrics(metrics: Dict[str, float]) -> None:
             </div>
             """, unsafe_allow_html=True)
 
-def run_simulation(model, env, config: Dict[str, Any]) -> Dict[str, Any]:
+def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = None) -> Dict[str, Any]:
     """Run simulation with given model and configuration.
     
     Parameters
@@ -308,8 +347,17 @@ def run_simulation(model, env, config: Dict[str, Any]) -> Dict[str, Any]:
     Dict[str, Any]
         Simulation results
     """
-    # Reset environment (no custom options)
-    obs, info = env.reset()
+    # Reset environment (optional seeding)
+    try:
+        obs, info = env.reset(seed=seed)
+    except TypeError:
+        # Older gym versions may not support seed kwarg here
+        if seed is not None and hasattr(env, "seed"):
+            try:
+                env.seed(seed)
+            except Exception:
+                pass
+        obs, info = env.reset()
 
     # Initialize hidden states for RecurrentPPO models
     if hasattr(model, "_is_recurrent") and model._is_recurrent and RECURRENT_PPO_AVAILABLE:
@@ -502,7 +550,7 @@ def main():
     
     # Sidebar configuration
     st.sidebar.title("Configuration")
-    
+
     # Model selection
     model_type = st.sidebar.selectbox(
         "Model Type",
@@ -510,12 +558,26 @@ def main():
         index=0,
         help="Select model architecture"
     )
-    
+
+    # Run / Replay mode and auto-retry settings
+    mode = st.sidebar.radio("Mode", ["Live", "Replay"], index=0)
+    auto_retry = st.sidebar.checkbox("Auto-retry until success", value=True)
+    max_attempts = st.sidebar.number_input("Max attempts", min_value=1, max_value=1000, value=20, step=1)
+    seed_base = st.sidebar.number_input("Seed base", min_value=0, value=123, step=1)
+    vary_seed = st.sidebar.checkbox("Vary seed per attempt", value=True)
+
+    # Saved runs
+    saved_jsons = sorted(SAVE_DIR.glob("*/run.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    saved_choices = [str(p) for p in saved_jsons]
+    selected_saved = st.sidebar.selectbox("Saved runs", saved_choices) if saved_choices else None
+    replay_btn = st.sidebar.button("Replay selected run")
+    replay_last_btn = st.sidebar.button("Replay last success")
+
     # Model checkpoint
     if model_type != "pid":
         default_ckpt = (
             "runs/student_distilled/final_model.zip" if model_type == "transformer"
-            else ("runs/baseline_lstm_recurrent/final_model.zip" if model_type == "lstm"
+            else ("runs/baseline_lstm_quick/final_model.zip" if model_type == "lstm"
                   else "runs/baseline_lstm/final_model.zip")
         )
         checkpoint = st.sidebar.text_input(
@@ -525,7 +587,7 @@ def main():
         )
     else:
         checkpoint = None
-    
+
     max_steps = st.sidebar.slider(
         "Max Steps",
         100, 1000, 500,
@@ -536,28 +598,36 @@ def main():
     config = {
         "max_steps": max_steps,
     }
-    
+
     # Load model button
     load_btn = st.sidebar.button("Load Model")
-    
+
     if load_btn:
+        # Normalize extension for non-PID models
+        ckpt_path = checkpoint
+        if model_type != "pid" and ckpt_path is not None:
+            low = ckpt_path.lower()
+            if low.endswith(".zip.zip"):
+                ckpt_path = ckpt_path[:-4]
+            elif not low.endswith(".zip"):
+                ckpt_path = ckpt_path + ".zip"
         with st.spinner(f"Loading {model_type.upper()} model..."):
-            model, env = load_model(checkpoint, model_type)
-            
+            model, env = load_model(ckpt_path, model_type)
+
         if model is not None and env is not None:
             st.session_state.model = model
             st.session_state.env = env
             st.success(f"{model_type.capitalize()} model loaded successfully!")
-            
+
             # Display model info
             if model_type != "pid":
                 st.subheader("Model Information")
-                
+
                 # Get parameter count
                 if hasattr(model, "policy"):
                     param_count = sum(p.numel() for p in model.policy.parameters() if p.requires_grad)
                     st.info(f"Trainable parameters: {param_count:,}")
-                    
+
                     # Display architecture details
                     if model_type == "transformer":
                         if hasattr(model.policy, "features_extractor"):
@@ -571,142 +641,200 @@ def main():
                                 - Layers: {len(transformer.global_layers) + len(transformer.local_layers) if hasattr(transformer, 'global_layers') else 'N/A'}
                                 - Memory: {'Yes' if extractor.use_memory else 'No'}
                                 """)
-    
+
     # Run simulation button
     run_btn = st.sidebar.button("Run Simulation")
-    
+
     # Main content
-    if "model" in st.session_state and "env" in st.session_state and run_btn:
+    if "model" in st.session_state and "env" in st.session_state:
         model = st.session_state.model
         env = st.session_state.env
-        
-        # Run simulation
-        with st.spinner("Running simulation..."):
-            results = run_simulation(model, env, config)
-        
-        # Display results
-        st.subheader("Simulation Results")
-        
-        # Display success/failure
-        if results["success"]:
-            st.success(f"Mission successful! Completed in {results['steps']} steps with reward {results['total_reward']:.2f}")
-        else:
-            st.error(f"Mission failed. Completed {results['steps']} steps with reward {results['total_reward']:.2f}")
-        
-        # Display metrics
-        st.subheader("Flight Metrics")
-        metrics = {
-            "TTC (s)": np.mean(results["ttc"]) if np.isfinite(results["ttc"]).any() else float("inf"),
-            "Path Dev (m)": np.mean(results["path_dev"]),
-            "Vel Error (%)": np.mean(results["vel_error"]),
-            "Avg Reward": np.mean(results["rewards"]),
-        }
-        display_metrics(metrics)
-        
-        # Create columns for visualization
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Display trajectory plot
-            st.subheader("3D Trajectory")
-            trajectory_fig = create_trajectory_plot(
-                results["positions"],
-                results["reference_trajectory"]
-            )
-            st.plotly_chart(trajectory_fig, use_container_width=True)
-        
-        with col2:
-            # Display metrics over time
-            st.subheader("Metrics Over Time")
-            metrics_df = pd.DataFrame({
-                "Step": np.arange(len(results["ttc"])),
-                "TTC (s)": np.clip(results["ttc"], 0, 10),  # Cap for visualization
-                "Path Deviation (m)": results["path_dev"],
-                "Velocity Error (%)": results["vel_error"],
-                "Reward": results["rewards"],
-            })
-            
-            # Create multi-line chart
-            metrics_fig = go.Figure()
-            
-            metrics_fig.add_trace(go.Scatter(
-                x=metrics_df["Step"], y=metrics_df["TTC (s)"],
-                mode="lines", name="TTC (s)", line=dict(color="green")
-            ))
-            
-            metrics_fig.add_trace(go.Scatter(
-                x=metrics_df["Step"], y=metrics_df["Path Deviation (m)"],
-                mode="lines", name="Path Dev (m)", line=dict(color="blue")
-            ))
-            
-            metrics_fig.add_trace(go.Scatter(
-                x=metrics_df["Step"], y=metrics_df["Velocity Error (%)"],
-                mode="lines", name="Vel Error (%)", line=dict(color="orange")
-            ))
-            
-            metrics_fig.add_trace(go.Scatter(
-                x=metrics_df["Step"], y=metrics_df["Reward"],
-                mode="lines", name="Reward", line=dict(color="purple")
-            ))
-            
-            metrics_fig.update_layout(
-                xaxis_title="Simulation Step",
-                yaxis_title="Value",
-                legend=dict(x=0, y=1, orientation="h"),
-                margin=dict(l=0, r=0, b=0, t=30),
-                height=400,
-            )
-            
-            st.plotly_chart(metrics_fig, use_container_width=True)
-        
-        # Display video if frames available
-        if results["frames"]:
-            st.subheader("Flight Video")
-            # Convert frames to MP4 in memory
-            video_bytes = io.BytesIO()
-            imageio.mimsave(video_bytes, results["frames"], format="mp4", fps=20)
-            video_bytes.seek(0)
-            st.video(video_bytes, format="video/mp4", caption="Flight Animation (MP4)")
-        
-        # Display attention visualization if available
-        if results["attention"] is not None and len(results["attention"]) > 0:
-            st.subheader("Attention Visualization")
-            
-            # Select step for attention visualization
-            step_slider = st.slider(
-                "Select timestep",
-                0, len(results["attention"]) - 1, 0
-            )
-            
-            # Visualize attention for selected step
-            attn_fig = visualize_attention(results["attention"][step_slider], step_slider)
-            st.pyplot(attn_fig)
-            
-            st.info("""
-            Attention visualization shows how the transformer model focuses on different parts of the input sequence.
-            Brighter colors indicate stronger attention. The red lines highlight the current timestep.
-            """)
-    
+
+        if mode == "Live" and run_btn:
+            attempts = 0
+            last_results = None
+            while True:
+                seed = (seed_base + attempts) if vary_seed else seed_base
+                with st.spinner(f"Running simulation (attempt {attempts+1})..."):
+                    results = run_simulation(model, env, config, seed=seed)
+                last_results = results
+
+                # Show quick summary per attempt
+                st.write(f"Attempt {attempts+1}: reward {results['total_reward']:.2f}, success={results['success']}")
+
+                if results["success"]:
+                    # Save successful run
+                    rec = RunRecord(
+                        id=str(uuid.uuid4()),
+                        timestamp=time.time(),
+                        model_type=model_type,
+                        model_path=checkpoint or "",
+                        config=config,
+                        metrics={
+                            "total_reward": float(results["total_reward"]),
+                            "steps": int(results["steps"]),
+                            "success": bool(results["success"]),
+                            "mean_ttc": float(np.nanmean(results["ttc"])) if np.isfinite(results["ttc"]).any() else float("inf"),
+                            "mean_path_dev": float(np.mean(results["path_dev"])),
+                            "mean_vel_error_pct": float(np.mean(results["vel_error"])),
+                        },
+                        positions=results["positions"].tolist(),
+                        velocities=results["velocities"].tolist(),
+                        rewards=results["rewards"].tolist(),
+                        ttc=results["ttc"].tolist(),
+                        path_dev=results["path_dev"].tolist(),
+                        vel_error=results["vel_error"].tolist(),
+                        reference_trajectory=(results["reference_trajectory"].tolist() if results["reference_trajectory"] is not None else None),
+                        video_path=None,
+                    )
+                    json_path = save_run(rec)
+                    # Save MP4 if frames are available
+                    if results.get("frames"):
+                        run_dir = Path(json_path).parent
+                        mp4_path = run_dir / "video.mp4"
+                        imageio.mimsave(str(mp4_path), results["frames"], format="mp4", fps=20)
+                        rec.video_path = str(mp4_path)
+                        with open(json_path, "w") as f:
+                            json.dump(asdict(rec), f)
+                    st.session_state.last_success_path = json_path
+                    st.success(f"Saved successful run → {json_path}")
+                    break
+
+                attempts += 1
+                if not auto_retry or attempts >= int(max_attempts):
+                    break
+
+            # Display the last attempt (success or not)
+            if last_results is not None:
+                st.subheader("Simulation Results")
+                if last_results["success"]:
+                    st.success(f"Mission successful! Completed in {last_results['steps']} steps with reward {last_results['total_reward']:.2f}")
+                else:
+                    st.error(f"Mission failed. Completed {last_results['steps']} steps with reward {last_results['total_reward']:.2f}")
+
+                st.subheader("Flight Metrics")
+                metrics = {
+                    "TTC (s)": np.mean(last_results["ttc"]) if np.isfinite(last_results["ttc"]).any() else float("inf"),
+                    "Path Dev (m)": np.mean(last_results["path_dev"]),
+                    "Vel Error (%)": np.mean(last_results["vel_error"]),
+                    "Avg Reward": np.mean(last_results["rewards"]),
+                }
+                display_metrics(metrics)
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.subheader("3D Trajectory")
+                    traj_fig = create_trajectory_plot(last_results["positions"], last_results["reference_trajectory"])
+                    st.plotly_chart(traj_fig, use_container_width=True)
+                with col2:
+                    st.subheader("Metrics Over Time")
+                    metrics_df = pd.DataFrame({
+                        "Step": np.arange(len(last_results["ttc"])),
+                        "TTC (s)": np.clip(last_results["ttc"], 0, 10),
+                        "Path Deviation (m)": last_results["path_dev"],
+                        "Velocity Error (%)": last_results["vel_error"],
+                        "Reward": last_results["rewards"],
+                    })
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["TTC (s)"], mode="lines", name="TTC (s)"))
+                    fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Path Deviation (m)"], mode="lines", name="Path Dev (m)"))
+                    fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Velocity Error (%)"], mode="lines", name="Vel Error (%)"))
+                    fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Reward"], mode="lines", name="Reward"))
+                    fig.update_layout(xaxis_title="Simulation Step", yaxis_title="Value", legend=dict(x=0, y=1, orientation="h"), margin=dict(l=0, r=0, b=0, t=30), height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+
+                if last_results.get("frames"):
+                    st.subheader("Flight Video")
+                    video_bytes = io.BytesIO()
+                    imageio.mimsave(video_bytes, last_results["frames"], format="mp4", fps=20)
+                    video_bytes.seek(0)
+                    st.video(video_bytes, format="video/mp4", caption="Flight Animation (MP4)")
+
+        # Replay mode
+        if mode == "Replay":
+            target = None
+            if replay_last_btn and st.session_state.get("last_success_path"):
+                target = st.session_state.last_success_path
+            elif replay_btn and selected_saved:
+                target = selected_saved
+
+            if target:
+                rec = load_run(target)
+                # Adapt record to results-like dict
+                results = {
+                    "positions": np.array(rec.positions),
+                    "reference_trajectory": (np.array(rec.reference_trajectory) if rec.reference_trajectory is not None else None),
+                    "ttc": np.array(rec.ttc),
+                    "path_dev": np.array(rec.path_dev),
+                    "vel_error": np.array(rec.vel_error),
+                    "rewards": np.array(rec.rewards),
+                    "success": bool(rec.metrics.get("success", False)),
+                    "steps": int(rec.metrics.get("steps", len(rec.rewards))),
+                    "total_reward": float(rec.metrics.get("total_reward", np.sum(rec.rewards))),
+                    "frames": [],
+                }
+                st.subheader("Replayed Results")
+                if results["success"]:
+                    st.success(f"Mission successful! Completed in {results['steps']} steps with reward {results['total_reward']:.2f}")
+                else:
+                    st.error(f"Mission failed. Completed {results['steps']} steps with reward {results['total_reward']:.2f}")
+
+                st.subheader("Flight Metrics")
+                metrics = {
+                    "TTC (s)": np.mean(results["ttc"]) if np.isfinite(results["ttc"]).any() else float("inf"),
+                    "Path Dev (m)": np.mean(results["path_dev"]),
+                    "Vel Error (%)": np.mean(results["vel_error"]),
+                    "Avg Reward": np.mean(results["rewards"]),
+                }
+                display_metrics(metrics)
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.subheader("3D Trajectory")
+                    traj_fig = create_trajectory_plot(results["positions"], results["reference_trajectory"])
+                    st.plotly_chart(traj_fig, use_container_width=True)
+                with col2:
+                    st.subheader("Metrics Over Time")
+                    metrics_df = pd.DataFrame({
+                        "Step": np.arange(len(results["ttc"])),
+                        "TTC (s)": np.clip(results["ttc"], 0, 10),
+                        "Path Deviation (m)": results["path_dev"],
+                        "Velocity Error (%)": results["vel_error"],
+                        "Reward": results["rewards"],
+                    })
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["TTC (s)"], mode="lines", name="TTC (s)"))
+                    fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Path Deviation (m)"], mode="lines", name="Path Dev (m)"))
+                    fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Velocity Error (%)"], mode="lines", name="Vel Error (%)"))
+                    fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Reward"], mode="lines", name="Reward"))
+                    fig.update_layout(xaxis_title="Simulation Step", yaxis_title="Value", legend=dict(x=0, y=1, orientation="h"), margin=dict(l=0, r=0, b=0, t=30), height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+
+                # If a saved MP4 exists, show it
+                if rec.video_path and os.path.exists(rec.video_path):
+                    st.subheader("Flight Video (Saved)")
+                    st.video(rec.video_path)
+
     # Display instructions if no model loaded
     if "model" not in st.session_state:
         st.info("👈 Configure and load a model using the sidebar to begin.")
-        
+
         # Display project information
         st.subheader("About the Project")
         st.markdown("""
         ### Drone Transformer RL
-        
+
         This project implements a transformer-based reinforcement learning approach for autonomous drone navigation.
         The system combines:
-        
+
         1. **Hierarchical Transformer Policy** - multi-scale attention with relative position encodings and memory
         2. **Reinforcement Learning** - PPO algorithm for policy optimization
         3. **Knowledge Distillation** - large teacher → lightweight student for real-time inference
         4. **Curriculum Learning** - progressive difficulty for robust performance
-        
+
         The model learns to navigate through complex environments, avoiding obstacles while maintaining desired
         trajectories and velocities.
-        
+
         **Key metrics:**
         - Time-to-Collision (TTC) > 3s (safety)
         - Path Deviation < 0.5m (accuracy)
