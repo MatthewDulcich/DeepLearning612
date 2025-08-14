@@ -1,0 +1,33 @@
+env_id: FlyCraft-v0
+eval_freq: 5000  # More frequent evaluation
+n_envs: 4  # Reduce to 4 envs for more stable training
+output_dir: runs
+policy: lstm
+policy_kwargs:
+  lstm_hidden: 128  # Smaller network to start
+  lstm_layers: 1    # Single layer to reduce complexity
+  dropout: 0.0      # No dropout initially
+  n_envs: 4
+ppo_kwargs:
+  batch_size: 256   # Much smaller batch size
+  clip_range: 0.1   # More conservative clipping
+  gae_lambda: 0.95
+  gamma: 0.98       # Lower discount for more immediate rewards
+  learning_rate: 0.0001  # Lower learning rate
+  n_epochs: 5       # Fewer epochs to prevent overfitting
+  n_steps: 256      # Shorter rollouts
+  ent_coef: 0.05    # Higher entropy for more exploration
+  vf_coef: 1.0      # Higher value function learning
+  max_grad_norm: 0.5
+  # Additional stability settings
+  use_sde: false
+  sde_sample_freq: -1
+run_name: baseline_lstm_debug
+save_freq: 10000
+seed: 42
+timesteps: 200000  # More training time
+
+# Debugging and analysis
+n_eval_episodes: 10
+capture_video: false
+verbose: 1
