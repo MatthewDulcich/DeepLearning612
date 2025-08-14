@@ -17,7 +17,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback, EvalCallback
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.utils import get_linear_fn, set_random_seed
-from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor, VecNormalize
+from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv, VecMonitor, VecNormalize
 
 # Local
 from drone_rl.models.transformer_policy import TransformerActorCritic
@@ -294,7 +294,8 @@ def main() -> None:
 
         # Vec envs + VecNormalize
         env_fns = [make_env(env_id, seed, i, args.capture_video, run_dir, max_episode_steps) for i in range(n_envs)]
-        train_env = SubprocVecEnv(env_fns)
+        # Use DummyVecEnv instead of SubprocVecEnv to avoid multiprocessing issues
+        train_env = DummyVecEnv(env_fns)
         train_env = VecMonitor(train_env)
         train_env = VecNormalize(
             train_env,
@@ -304,7 +305,7 @@ def main() -> None:
         )
 
         eval_env_fns = [make_env(env_id, seed + 1000, 0, args.capture_video, run_dir, max_episode_steps)]
-        eval_env = SubprocVecEnv(eval_env_fns)
+        eval_env = DummyVecEnv(eval_env_fns)
         eval_env = VecMonitor(eval_env)
         eval_env = VecNormalize(
             eval_env,

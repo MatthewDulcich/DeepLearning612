@@ -546,32 +546,3 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         if hasattr(self.features_extractor, "reset_hidden"):
             self.features_extractor.reset_hidden(n_envs=n_envs, done_mask=done_mask)
 
-
-/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/utils.py:195: UserWarning: get_linear_fn() is deprecated, please use LinearSchedule() instead
-  warnings.warn("get_linear_fn() is deprecated, please use LinearSchedule() instead")
-Using cpu device
-Logging to runs/baseline_lstm
-Traceback (most recent call last):
-  File "/home/mrdulcich/Desktop/DeepLearning612/src/drone_rl/train/train.py", line 599, in <module>
-    main()
-  File "/home/mrdulcich/Desktop/DeepLearning612/src/drone_rl/train/train.py", line 585, in main
-    model.learn(total_timesteps=timesteps, callback=callbacks)
-  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/ppo/ppo.py", line 311, in learn
-    return super().learn(
-  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/on_policy_algorithm.py", line 311, in learn
-    total_timesteps, callback = self._setup_learn(
-  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/base_class.py", line 423, in _setup_learn
-    self._last_obs = self.env.reset()  # type: ignore[assignment]
-  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/vec_env/vec_normalize.py", line 297, in reset
-    obs = self.venv.reset()
-  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/vec_env/vec_monitor.py", line 70, in reset
-    obs = self.venv.reset()
-  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/stable_baselines3/common/vec_env/subproc_vec_env.py", line 144, in reset
-    remote.send(("reset", (self._seeds[env_idx], self._options[env_idx])))
-  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/multiprocessing/connection.py", line 206, in send
-    self._send_bytes(_ForkingPickler.dumps(obj))
-  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/multiprocessing/connection.py", line 411, in _send_bytes
-    self._send(header + buf)
-  File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/multiprocessing/connection.py", line 368, in _send
-    n = write(self._handle, buf)
-BrokenPipeError: [Errno 32] Broken pipe
