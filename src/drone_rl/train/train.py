@@ -80,13 +80,25 @@ def make_env(
     capture_video: bool = False,
     run_dir: Optional[Path] = None,
     max_episode_steps: int = 1000,
+    # NEW curriculum args:
+    step_frequence: int = 10,
+    control_mode: str = "guidance_law_mode",
+    reward_mode: str = "dense",
+    goal_cfg: Optional[dict] = None,
 ) -> Callable[[], gym.Env]:
     def _init() -> gym.Env:
         try:
             import flycraft  # noqa: F401
         except ImportError:
             pass
-        env = gym.make(env_id, max_episode_steps=max_episode_steps)
+        env = gym.make(
+            env_id,
+            max_episode_steps=max_episode_steps,
+            step_frequence=step_frequence,
+            control_mode=control_mode,
+            reward_mode=reward_mode,
+            goal_cfg=goal_cfg or {"type": "fixed_short", "distance_m": 200},
+        )
         env.reset(seed=seed + rank)
 
         if capture_video and rank == 0 and run_dir is not None:
@@ -276,6 +288,14 @@ def main() -> None:
 
     for freq in step_frequencies:
         print(f"\n=== Training with step_frequency={freq}Hz ===")
+        
+        # Get stage-specific curriculum settings from config (with fallbacks)
+        goal_cfg = cfg.get("goal_cfg_by_freq", {}).get(str(freq), {"type": "fixed_short", "distance_m": 200})
+        control_mode = cfg.get("control_mode_by_freq", {}).get(str(freq), "guidance_law_mode")
+        reward_mode = cfg.get("reward_mode_by_freq", {}).get(str(freq), "dense")
+        
+        print(f"[Curriculum] Using: freq={freq}Hz, control_mode={control_mode}, reward_mode={reward_mode}, goal_cfg={goal_cfg}")
+        
         # dirs
         output_dir = Path(cfg.get("output_dir", "runs"))
         run_name = cfg.get("run_name", f"{env_id.split('-')[0]}_{int(time.time())}_f{freq}")
@@ -293,8 +313,14 @@ def main() -> None:
                 monitor_gym=True,
             )
 
-        # Vec envs + VecNormalize
-        env_fns = [make_env(env_id, seed, i, args.capture_video, run_dir, max_episode_steps) for i in range(n_envs)]
+        # Vec envs + VecNormalize - now with curriculum args
+        env_fns = [make_env(
+            env_id, seed, i, args.capture_video, run_dir, max_episode_steps,
+            step_frequence=freq,
+            control_mode=control_mode,
+            reward_mode=reward_mode,
+            goal_cfg=goal_cfg
+        ) for i in range(n_envs)]
         # Use DummyVecEnv instead of SubprocVecEnv to avoid multiprocessing issues
         train_env = DummyVecEnv(env_fns)
         train_env = VecMonitor(train_env)
@@ -305,7 +331,13 @@ def main() -> None:
             gamma=cfg.get("ppo_kwargs", {}).get("gamma", 0.99),
         )
 
-        eval_env_fns = [make_env(env_id, seed + 1000, 0, args.capture_video, run_dir, max_episode_steps)]
+        eval_env_fns = [make_env(
+            env_id, seed + 1000, 0, args.capture_video, run_dir, max_episode_steps,
+            step_frequence=freq,
+            control_mode=control_mode,
+            reward_mode=reward_mode,
+            goal_cfg=goal_cfg
+        )]
         eval_env = DummyVecEnv(eval_env_fns)
         eval_env = VecMonitor(eval_env)
         eval_env = VecNormalize(
@@ -398,21 +430,18 @@ def main() -> None:
         timesteps = cfg.get("timesteps", 1_000_000)
         model.learn(total_timesteps=timesteps, callback=callbacks)
 
-        # Evaluate success rate (using eval_env)
-        n_eval = 10
+        # Evaluate success rate (VecEnv safe)
+        n_eval = cfg.get("n_eval_episodes", 10)
         successes = 0
         for _ in range(n_eval):
             obs = eval_env.reset()
-            done = False
-            while not done:
+            done = np.array([False])
+            while not done[0]:
                 action, _ = model.predict(obs, deterministic=True)
-                obs, reward, done, info = eval_env.step(action)
-                if isinstance(done, (list, np.ndarray)):
-                    done = done[0]
-                if done and (isinstance(info, list) and info[0].get("is_success", False)):
-                    successes += 1
-                elif done and (isinstance(info, dict) and info.get("is_success", False)):
-                    successes += 1
+                obs, reward, done, info = eval_env.step(action)  # VecEnv returns arrays
+            info0 = info[0]
+            if info0.get("success", False) or info0.get("is_success", False):
+                successes += 1
         success_rate = successes / n_eval
         curriculum_log.append({"step_frequency": freq, "success_rate": success_rate})
         print(f"[Curriculum] step_frequency={freq}Hz, success_rate={success_rate:.2f}")
@@ -429,180 +458,7 @@ def main() -> None:
             print(f"[Curriculum] Stopping: success_rate {success_rate:.2f} < threshold {success_threshold}")
             break
 
-    # policy
-    policy_name = cfg.get("policy", "transformer")
-    if policy_name not in POLICIES:
-        raise ValueError(f"Unknown policy: {policy_name}. Available: {list(POLICIES.keys())}")
-    policy_cls = POLICIES[policy_name]
-    if policy_name == "transformer" and cfg.get("use_performer", False) and PERFORMER_AVAILABLE:
-        policy_cls = POLICIES["performer"]
-
-      # wider initial exploration  # for continuous actions, adjust if needed
-
-    # --------- choose policy class ---------
-    policy_name = cfg.get("policy", "transformer")
-    if policy_name not in POLICIES:
-        raise ValueError(f"Unknown policy: {policy_name}. Available: {list(POLICIES.keys())}")
-    policy_cls = POLICIES[policy_name]
-    if policy_name == "transformer" and cfg.get("use_performer", False) and PERFORMER_AVAILABLE:
-        policy_cls = POLICIES["performer"]
-
-    # --------- POLICY KWARGS ---------
-    policy_kwargs = cfg.get("policy_kwargs", {})
-    # wider initial exploration for continuous action spaces
-    if isinstance(train_env.action_space, gym.spaces.Box):
-        policy_kwargs["log_std_init"] = -0.3
-
-    # clean feature-extractor kwargs
-    fx_kwargs = policy_kwargs.get("features_extractor_kwargs", {})
-    fx_kwargs.pop("use_spatio_temporal", None)
-    # Add n_envs for LSTM policies
-    if policy_name == "lstm":
-        fx_kwargs["n_envs"] = n_envs
-    policy_kwargs["features_extractor_kwargs"] = fx_kwargs
-    
-    # Only add transformer_kwargs for transformer/performer policies
-    if policy_name in ["transformer", "performer"]:
-        policy_kwargs.setdefault("transformer_kwargs", {})
-        policy_kwargs["transformer_kwargs"].setdefault("attn_backend", "torch")
-
-    # --------- PPO KWARGS ---------
-    ppo_kwargs = cfg.get("ppo_kwargs", {})
-    ppo_kwargs.setdefault("verbose", 1)
-    ppo_kwargs.setdefault("device", device)
-    ppo_kwargs.setdefault("vf_coef", 1.0)        # prioritize critic a bit more
-    ppo_kwargs.setdefault("ent_coef", 0.01)
-    ppo_kwargs.setdefault("max_grad_norm", 0.5)
-    ppo_kwargs.setdefault("n_epochs", 2)
-    ppo_kwargs.setdefault("batch_size", 2048)
-
-    # schedules (override static if present)
-    ppo_kwargs["learning_rate"] = get_linear_fn(1e-4, 5e-6, 1.0)
-    ppo_kwargs["clip_range"]    = get_linear_fn(0.2, 0.1, 1.0)
-    ppo_kwargs["target_kl"]     = None  # use clip only, or set e.g. 0.02 if you want auto-early-stop
-
-    # --------- build model ---------
-    model = PPO(
-        policy=policy_cls,
-        env=train_env,
-        tensorboard_log=str(run_dir / "tb"),
-        policy_kwargs=policy_kwargs,
-        **ppo_kwargs,
-    )
-
-    # Sequence predictor
-    if cfg.get("predict_sequence", False):
-        obs_space = train_env.observation_space
-        if isinstance(obs_space, gym.spaces.Dict):
-            state_dim = int(sum(np.prod(sp.shape) for sp in obs_space.spaces.values()))
-        else:
-            state_dim = int(np.prod(obs_space.shape))
-
-        embed_dim_for_seq = model.policy.features_extractor.features_dim
-        seq_predictor = StateSequencePredictor(
-            embed_dim=embed_dim_for_seq,
-            state_dim=state_dim,
-            horizon=cfg.get("prediction_horizon", 200),
-            hidden_dim=cfg.get("decoder_hidden_dim", 256),
-            num_layers=cfg.get("decoder_layers", 2),
-        ).to(model.policy.device)
-
-        def _flatten_first_env_t(obs_t):
-            if isinstance(obs_t, dict):
-                return torch.cat([v[0].reshape(-1) for v in obs_t.values()], dim=0)
-            return obs_t[0].reshape(-1)
-
-        @torch.no_grad()
-        def predict_next_states(obs0, horizon=None):
-            if horizon is None:
-                horizon = cfg.get("prediction_horizon", 200)
-            obs_t, _ = model.policy.obs_to_tensor(obs0)
-            emb = model.policy.extract_features(obs_t)
-            init_state = _flatten_first_env_t(obs_t)
-            preds = seq_predictor(embedding=emb[0].unsqueeze(0), initial_state=init_state.unsqueeze(0))
-            return preds.cpu().numpy()[0][:horizon]
-
-        model.policy.state_predictor = seq_predictor
-        model.policy.predict_next_states = predict_next_states  # type: ignore
-
-    # logger
-    model.set_logger(configure(str(run_dir), ["stdout", "csv", "tensorboard"]))
-
-    # KD
-    if args.teacher:
-        print(f"Loading teacher model from {args.teacher} for knowledge distillation")
-        teacher = PPO.load(args.teacher, env=train_env, device=device)
-
-        def custom_distillation_loss(model_outputs):
-            pi_logits, values, old_logprobs, advantages, returns, entropy_coef, vf_coef = model_outputs
-            with torch.no_grad():
-                t_actions, t_values, t_log_probs = teacher.policy.evaluate_actions(model.policy._last_obs)
-            kd_loss = student_loss(
-                (pi_logits, values),
-                (t_log_probs, t_values),
-                temperature=cfg.get("distillation_temperature", 2.0),
-                alpha=cfg.get("distillation_alpha", 0.5),
-            )
-            kd_weight = cfg.get("distillation_weight", 0.5)
-            ppo_loss = model.policy.loss(pi_logits, values, old_logprobs, advantages, returns, entropy_coef, vf_coef)
-            return (1 - kd_weight) * ppo_loss + kd_weight * kd_loss
-
-        model.policy.custom_loss = custom_distillation_loss  # type: ignore
-
-    # callbacks
-    save_freq = max(cfg.get("save_freq", 10000) // n_envs, 1)
-    eval_freq = max(cfg.get("eval_freq", 20000) // n_envs, 1)
-
-    callbacks: List[BaseCallback] = [
-        CheckpointCallback(
-            save_freq=save_freq,
-            save_path=str(run_dir / "checkpoints"),
-            name_prefix=run_name,
-            save_replay_buffer=False,
-            save_vecnormalize=True,
-        ),
-        EvalCallback(
-            eval_env,
-            best_model_save_path=str(run_dir),
-            log_path=str(run_dir / "eval"),
-            eval_freq=eval_freq,
-            n_eval_episodes=cfg.get("n_eval_episodes", 5),
-            deterministic=True,
-            render=args.capture_video,
-        ),
-        ModelComplexityCallback(),
-    ]
-    
-    # Add LSTM reset callback if using LSTM policy
-    if policy_name == "lstm":
-        callbacks.append(LSTMResetCallback(verbose=1))
-
-    if cfg.get("predict_sequence", False):
-        callbacks.append(
-            SequencePredictionCallback(
-                eval_env=eval_env,
-                eval_freq=eval_freq,
-                n_eval_episodes=cfg.get("n_eval_episodes", 5),
-                horizon=cfg.get("prediction_horizon", 200),
-            )
-        )
-
-    if args.wandb and WANDB_AVAILABLE:
-        callbacks.append(WandbCallback())
-
-    # train
-    timesteps = cfg.get("timesteps", 1_000_000)
-    model.learn(total_timesteps=timesteps, callback=callbacks)
-
-    # save
-    model.save(run_dir / cfg.get("save_name", "final_model"))
-    train_env.save(str(run_dir / "vecnormalize.pkl"))
-
-    train_env.close()
-    eval_env.close()
-    if args.wandb and WANDB_AVAILABLE:
-        wandb.finish()
-    print(f"Training complete. Model saved to {run_dir}")
+    print(f"[Curriculum] Training completed. Log: {curriculum_log}")
 
 
 if __name__ == "__main__":
