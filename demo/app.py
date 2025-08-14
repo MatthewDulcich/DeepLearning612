@@ -379,6 +379,13 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
         print(f"DEBUG: Initial obs keys: {list(obs.keys())}")
     print(f"DEBUG: Initial position from info: {init_pos}")
     
+    # Debug action space bounds
+    print(f"DEBUG: Action space: {env.action_space}")
+    if hasattr(env.action_space, 'low') and hasattr(env.action_space, 'high'):
+        print(f"DEBUG: Action space low: {env.action_space.low}")
+        print(f"DEBUG: Action space high: {env.action_space.high}")
+        print(f"DEBUG: Action space shape: {env.action_space.shape}")
+    
     # Try to extract position from plane_state in info
     if np.allclose(init_pos, 0) and "plane_state" in info:
         plane_state = info["plane_state"]
@@ -700,6 +707,13 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
     results["ttc"] = np.array(results["ttc"])
     results["path_dev"] = np.array(results["path_dev"])
     results["vel_error"] = np.array(results["vel_error"])
+    
+    # Debug position data
+    print(f"DEBUG: Final positions shape: {results['positions'].shape}")
+    print(f"DEBUG: Position range X: [{np.min(results['positions'][:, 0]):.3f}, {np.max(results['positions'][:, 0]):.3f}]")
+    print(f"DEBUG: Position range Y: [{np.min(results['positions'][:, 1]):.3f}, {np.max(results['positions'][:, 1]):.3f}]")  
+    print(f"DEBUG: Position range Z: [{np.min(results['positions'][:, 2]):.3f}, {np.max(results['positions'][:, 2]):.3f}]")
+    print(f"DEBUG: Total movement: {np.linalg.norm(results['positions'][-1] - results['positions'][0]):.3f}")
     
     # Add summary metrics
     results["total_reward"] = total_reward
@@ -1062,6 +1076,11 @@ def main():
                                 end_pos = positions_array[-1]
                                 actual_movement = end_pos - start_pos
                                 
+                                # Debug movement data
+                                print(f"DEBUG: Start position: {start_pos}")
+                                print(f"DEBUG: End position: {end_pos}")
+                                print(f"DEBUG: Actual movement: {actual_movement}")
+                                
                                 # Get target if available
                                 target_movement = None
                                 if last_results.get("reference_trajectory") is not None:
@@ -1069,6 +1088,10 @@ def main():
                                     if len(ref_traj) > 0:
                                         target_pos = ref_traj[-1]
                                         target_movement = target_pos - start_pos
+                                        print(f"DEBUG: Target position: {target_pos}")
+                                        print(f"DEBUG: Required movement: {target_movement}")
+                                else:
+                                    print(f"DEBUG: No reference trajectory available")
                                 
                                 col1, col2 = st.columns(2)
                                 
