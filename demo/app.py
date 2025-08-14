@@ -570,8 +570,27 @@ def main():
     saved_jsons = sorted(SAVE_DIR.glob("*/run.json"), key=lambda p: p.stat().st_mtime, reverse=True)
     saved_choices = [str(p) for p in saved_jsons]
     selected_saved = st.sidebar.selectbox("Saved runs", saved_choices) if saved_choices else None
+    
+    # Show replay buttons regardless of mode for easier access
     replay_btn = st.sidebar.button("Replay selected run")
     replay_last_btn = st.sidebar.button("Replay last success")
+    
+    # Show status of last success
+    if st.session_state.get("last_success_path"):
+        last_success_name = Path(st.session_state.last_success_path).parent.name
+        st.sidebar.success(f"Last success: {last_success_name}")
+    else:
+        st.sidebar.info("No successful runs yet")
+    
+    # Debug info (can be hidden in production)
+    with st.sidebar.expander("Debug Info"):
+        st.write(f"Saved runs found: {len(saved_choices)}")
+        st.write(f"Last success path: {st.session_state.get('last_success_path', 'None')}")
+        st.write(f"Save directory: {SAVE_DIR}")
+        if st.button("Clear last success"):
+            if "last_success_path" in st.session_state:
+                del st.session_state.last_success_path
+            st.rerun()
 
     # Model checkpoint
     if model_type != "pid":
@@ -688,16 +707,30 @@ def main():
                         video_path=None,
                     )
                     json_path = save_run(rec)
-                    # Save MP4 if frames are available
-                    if results.get("frames"):
-                        run_dir = Path(json_path).parent
-                        mp4_path = run_dir / "video.mp4"
-                        imageio.mimsave(str(mp4_path), results["frames"], format="mp4", fps=20)
-                        rec.video_path = str(mp4_path)
-                        with open(json_path, "w") as f:
-                            json.dump(asdict(rec), f)
-                    st.session_state.last_success_path = json_path
-                    st.success(f"Saved successful run → {json_path}")
+                    
+                    try:
+                        # Save MP4 if frames are available (optional)
+                        if results.get("frames") and len(results["frames"]) > 0:
+                            run_dir = Path(json_path).parent
+                            mp4_path = run_dir / "video.mp4"
+                            imageio.mimsave(str(mp4_path), results["frames"], format="mp4", fps=20)
+                            rec.video_path = str(mp4_path)
+                            # Update the saved record with video path
+                            with open(json_path, "w") as f:
+                                json.dump(asdict(rec), f)
+                            save_message = f"✅ Saved successful run with video → {Path(json_path).parent.name}"
+                        else:
+                            save_message = f"✅ Saved successful run (trajectory data) → {Path(json_path).parent.name}"
+                        
+                        st.session_state.last_success_path = json_path
+                        st.success(save_message)
+                        
+                        # Trigger rerun to update sidebar status
+                        st.rerun()
+                        
+                    except Exception as save_error:
+                        st.error(f"Failed to save run details: {save_error}")
+                    
                     break
 
                 attempts += 1
@@ -750,16 +783,25 @@ def main():
                     video_bytes.seek(0)
                     st.video(video_bytes, format="video/mp4", caption="Flight Animation (MP4)")
 
-        # Replay mode
-        if mode == "Replay":
-            target = None
-            if replay_last_btn and st.session_state.get("last_success_path"):
-                target = st.session_state.last_success_path
-            elif replay_btn and selected_saved:
-                target = selected_saved
-
-            if target:
-                rec = load_run(target)
+        # Check for replay button clicks (works in any mode)
+        replay_target = None
+        if replay_last_btn:
+            if st.session_state.get("last_success_path"):
+                replay_target = st.session_state.last_success_path
+                st.info(f"Replaying last successful run...")
+            else:
+                st.warning("No successful run available to replay. Run a simulation first!")
+        elif replay_btn:
+            if selected_saved:
+                replay_target = selected_saved
+                st.info(f"Replaying selected run: {Path(selected_saved).parent.name}")
+            else:
+                st.warning("Please select a saved run to replay!")
+        
+        # Handle replay
+        if replay_target:
+            try:
+                rec = load_run(replay_target)
                 # Adapt record to results-like dict
                 results = {
                     "positions": np.array(rec.positions),
@@ -773,6 +815,7 @@ def main():
                     "total_reward": float(rec.metrics.get("total_reward", np.sum(rec.rewards))),
                     "frames": [],
                 }
+                
                 st.subheader("Replayed Results")
                 if results["success"]:
                     st.success(f"Mission successful! Completed in {results['steps']} steps with reward {results['total_reward']:.2f}")
@@ -787,6 +830,78 @@ def main():
                     "Avg Reward": np.mean(results["rewards"]),
                 }
                 display_metrics(metrics)
+                
+                # Create visualization columns
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Display trajectory plot
+                    st.subheader("3D Trajectory")
+                    trajectory_fig = create_trajectory_plot(
+                        results["positions"],
+                        results["reference_trajectory"]
+                    )
+                    st.plotly_chart(trajectory_fig, use_container_width=True)
+                
+                with col2:
+                    # Display metrics over time
+                    st.subheader("Metrics Over Time")
+                    metrics_df = pd.DataFrame({
+                        "Step": np.arange(len(results["ttc"])),
+                        "TTC (s)": np.clip(results["ttc"], 0, 10),
+                        "Path Deviation (m)": results["path_dev"],
+                        "Velocity Error (%)": results["vel_error"],
+                        "Reward": results["rewards"],
+                    })
+                    
+                    # Create multi-line chart
+                    metrics_fig = go.Figure()
+                    
+                    metrics_fig.add_trace(go.Scatter(
+                        x=metrics_df["Step"], y=metrics_df["TTC (s)"],
+                        mode="lines", name="TTC (s)", line=dict(color="green")
+                    ))
+                    
+                    metrics_fig.add_trace(go.Scatter(
+                        x=metrics_df["Step"], y=metrics_df["Path Deviation (m)"],
+                        mode="lines", name="Path Dev (m)", line=dict(color="blue")
+                    ))
+                    
+                    metrics_fig.add_trace(go.Scatter(
+                        x=metrics_df["Step"], y=metrics_df["Velocity Error (%)"],
+                        mode="lines", name="Vel Error (%)", line=dict(color="orange")
+                    ))
+                    
+                    metrics_fig.add_trace(go.Scatter(
+                        x=metrics_df["Step"], y=metrics_df["Reward"],
+                        mode="lines", name="Reward", line=dict(color="purple")
+                    ))
+                    
+                    metrics_fig.update_layout(
+                        xaxis_title="Simulation Step",
+                        yaxis_title="Value",
+                        legend=dict(x=0, y=1, orientation="h"),
+                        margin=dict(l=0, r=0, b=0, t=30),
+                        height=400,
+                    )
+                    
+                    st.plotly_chart(metrics_fig, use_container_width=True)
+                
+                # Load and display video if available (optional)
+                if hasattr(rec, 'video_path') and rec.video_path and Path(rec.video_path).exists():
+                    st.subheader("Flight Video")
+                    with open(rec.video_path, 'rb') as video_file:
+                        video_bytes = video_file.read()
+                        st.video(video_bytes, format="video/mp4", caption="Replayed Flight Animation")
+                
+                # Always show replay complete message
+                st.success("🎬 Replay complete! The trajectory and metrics above show the flight path.")
+                    
+            except Exception as e:
+                st.error(f"Failed to load replay: {e}")
+        
+        # Live simulation mode (original functionality)
+        elif "model" in st.session_state and "env" in st.session_state and run_btn:
 
                 col1, col2 = st.columns(2)
                 with col1:
