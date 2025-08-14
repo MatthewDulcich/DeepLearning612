@@ -199,6 +199,19 @@ def create_trajectory_plot(positions: np.ndarray, reference: Optional[np.ndarray
     Figure
         Plotly figure with trajectory
     """
+    # Debug: Check the shape and content of positions
+    print(f"DEBUG: positions shape: {positions.shape}")
+    print(f"DEBUG: positions dtype: {positions.dtype}")
+    print(f"DEBUG: First few positions:\n{positions[:min(5, len(positions))]}")
+    print(f"DEBUG: Last few positions:\n{positions[-min(5, len(positions)):]}")
+    
+    # Check if all positions are the same (which would cause only endpoints to show)
+    if len(positions) > 1:
+        pos_diff = np.diff(positions, axis=0)
+        total_movement = np.sum(np.linalg.norm(pos_diff, axis=1))
+        print(f"DEBUG: Total movement distance: {total_movement}")
+        print(f"DEBUG: Position differences (first 3):\n{pos_diff[:3]}")
+    
     fig = make_subplots(rows=1, cols=1, specs=[[{"type": "scatter3d"}]])
     
     # Add drone trajectory (lines only, no markers)
@@ -371,6 +384,21 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
     # Seed logs with initial state (so Start and Path render correctly)
     init_pos = info.get("drone_position", np.zeros(3))
     init_vel = info.get("drone_velocity", np.zeros(3))
+    
+    # Debug: Check what's in the initial info and obs
+    print(f"DEBUG: Initial info keys: {list(info.keys())}")
+    print(f"DEBUG: Initial obs shape: {obs.shape if hasattr(obs, 'shape') else type(obs)}")
+    print(f"DEBUG: Initial position from info: {init_pos}")
+    
+    # Try to extract position from observation if not in info
+    if np.allclose(init_pos, 0) and hasattr(obs, 'shape') and len(obs.shape) == 1:
+        # For many flight envs, position is often the first 3 elements of obs
+        if obs.shape[0] >= 3:
+            potential_pos = obs[:3]
+            print(f"DEBUG: Potential position from obs[:3]: {potential_pos}")
+            if not np.allclose(potential_pos, 0):
+                init_pos = potential_pos
+                print(f"DEBUG: Using position from observation: {init_pos}")
 
     # Prepare result storage
     results = {
@@ -463,7 +491,27 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
         if "rgb_array" in info:
             results["frames"].append(info["rgb_array"])
         
-        results["positions"].append(info.get("drone_position", np.zeros(3)))
+        # Debug: Print info keys to see what's available
+        if step < 3:  # Only print for first few steps to avoid spam
+            print(f"DEBUG Step {step}: info keys: {list(info.keys())}")
+            if "drone_position" in info:
+                print(f"DEBUG Step {step}: drone_position: {info['drone_position']}")
+            else:
+                print(f"DEBUG Step {step}: drone_position not found in info")
+                print(f"DEBUG Step {step}: obs shape: {obs.shape if hasattr(obs, 'shape') else type(obs)}")
+        
+        drone_pos = info.get("drone_position", None)
+        
+        # If drone_position not in info, try to extract from observation
+        if drone_pos is None:
+            if hasattr(obs, 'shape') and len(obs.shape) == 1 and obs.shape[0] >= 3:
+                drone_pos = obs[:3]  # Position often first 3 elements
+                if step < 3:
+                    print(f"DEBUG Step {step}: Extracted position from obs: {drone_pos}")
+            else:
+                drone_pos = np.zeros(3)  # Fallback
+        
+        results["positions"].append(drone_pos)
         results["velocities"].append(info.get("drone_velocity", np.zeros(3)))
         results["actions"].append(action)
         results["rewards"].append(reward)
