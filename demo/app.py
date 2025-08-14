@@ -623,6 +623,25 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
         results["actions"].append(action)
         results["rewards"].append(reward)
         
+        # Debug action patterns (track movement tendencies)
+        if step < 10 or step % 50 == 0:  # Log periodically
+            if hasattr(action, 'shape') and len(action) >= 3:
+                print(f"DEBUG Step {step}: Action: {action[:3]} (type: {type(action).__name__})")
+            else:
+                print(f"DEBUG Step {step}: Action: {action} (type: {type(action).__name__})")
+        
+        # Track target information for analysis
+        if "desired_goal" in info:
+            desired_goal = info["desired_goal"]
+            if step == 0:
+                print(f"DEBUG: Desired goal: {desired_goal}")
+                if hasattr(desired_goal, '__len__') and len(desired_goal) >= 3:
+                    goal_diff = np.array(desired_goal[:3]) if init_pos is not None else None
+                    if goal_diff is not None and not np.allclose(init_pos, 0):
+                        movement_required = goal_diff - init_pos
+                        print(f"DEBUG: Required movement [x,y,z]: {movement_required}")
+                        print(f"DEBUG: Largest movement dimension: {np.argmax(np.abs(movement_required))} ({'x' if np.argmax(np.abs(movement_required))==0 else 'y' if np.argmax(np.abs(movement_required))==1 else 'z'})")
+        
         # Compute metrics
         if "obstacles" in info and len(info["obstacles"]) > 0:
             ttc_val, _ = time_to_collision(
@@ -688,6 +707,21 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
     results["success"] = info.get("success", info.get("is_success", False))
     results["steps"] = step + 1
     results["reference_trajectory"] = reference_trajectory
+    
+    # Analyze action patterns to understand model behavior
+    actions_array = np.array(results["actions"])
+    if len(actions_array.shape) > 1 and actions_array.shape[1] >= 3:
+        action_means = np.mean(actions_array, axis=0)
+        action_stds = np.std(actions_array, axis=0)
+        print(f"DEBUG: Action means: {action_means[:3]} (x, y, z movement tendencies)")
+        print(f"DEBUG: Action stds: {action_stds[:3]} (movement variability)")
+        
+        # Check if model is avoiding certain directions
+        if len(action_means) >= 3:
+            dominant_axis = np.argmax(np.abs(action_means[:3]))
+            weakest_axis = np.argmin(np.abs(action_means[:3]))
+            print(f"DEBUG: Dominant movement axis: {dominant_axis} ({'x' if dominant_axis==0 else 'y' if dominant_axis==1 else 'z'})")
+            print(f"DEBUG: Weakest movement axis: {weakest_axis} ({'x' if weakest_axis==0 else 'y' if weakest_axis==1 else 'z'})")
     
     # Debug success detection
     print(f"DEBUG: Final info keys: {list(info.keys())}")
@@ -939,6 +973,162 @@ def main():
                     fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Reward"], mode="lines", name="Reward"))
                     fig.update_layout(xaxis_title="Simulation Step", yaxis_title="Value", legend=dict(x=0, y=1, orientation="h"), margin=dict(l=0, r=0, b=0, t=30), height=400)
                     st.plotly_chart(fig, use_container_width=True, key="training_metrics")
+
+                # Add action analysis plots
+                st.subheader("Action Analysis")
+                if len(last_results["actions"]) > 0:
+                    actions_array = np.array(last_results["actions"])
+                    
+                    if len(actions_array.shape) > 1 and actions_array.shape[1] >= 3:
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            # Action patterns over time
+                            st.write("**Actions Over Time**")
+                            action_fig = go.Figure()
+                            steps = np.arange(len(actions_array))
+                            
+                            action_labels = ['X-axis', 'Y-axis', 'Z-axis']
+                            colors = ['red', 'green', 'blue']
+                            
+                            for i in range(min(3, actions_array.shape[1])):
+                                action_fig.add_trace(go.Scatter(
+                                    x=steps, 
+                                    y=actions_array[:, i],
+                                    mode="lines", 
+                                    name=f"Action {action_labels[i]}",
+                                    line=dict(color=colors[i])
+                                ))
+                            
+                            action_fig.update_layout(
+                                xaxis_title="Simulation Step",
+                                yaxis_title="Action Value",
+                                legend=dict(x=0, y=1, orientation="h"),
+                                margin=dict(l=0, r=0, b=0, t=30),
+                                height=350
+                            )
+                            st.plotly_chart(action_fig, use_container_width=True, key="action_patterns")
+                        
+                        with col2:
+                            # Action statistics
+                            st.write("**Action Statistics**")
+                            action_means = np.mean(actions_array[:, :3], axis=0)
+                            action_stds = np.std(actions_array[:, :3], axis=0)
+                            action_ranges = np.max(actions_array[:, :3], axis=0) - np.min(actions_array[:, :3], axis=0)
+                            
+                            stats_fig = go.Figure()
+                            
+                            x_labels = ['X-axis', 'Y-axis', 'Z-axis']
+                            
+                            stats_fig.add_trace(go.Bar(
+                                x=x_labels,
+                                y=np.abs(action_means),
+                                name='Mean (abs)',
+                                marker_color='lightblue'
+                            ))
+                            
+                            stats_fig.add_trace(go.Bar(
+                                x=x_labels,
+                                y=action_stds,
+                                name='Std Dev',
+                                marker_color='orange'
+                            ))
+                            
+                            stats_fig.add_trace(go.Bar(
+                                x=x_labels,
+                                y=action_ranges,
+                                name='Range',
+                                marker_color='lightgreen'
+                            ))
+                            
+                            stats_fig.update_layout(
+                                xaxis_title="Movement Axis",
+                                yaxis_title="Action Magnitude",
+                                barmode='group',
+                                legend=dict(x=0, y=1, orientation="h"),
+                                margin=dict(l=0, r=0, b=0, t=30),
+                                height=350
+                            )
+                            st.plotly_chart(stats_fig, use_container_width=True, key="action_stats")
+                        
+                        # Movement analysis
+                        if len(last_results["positions"]) > 1:
+                            positions_array = np.array(last_results["positions"])
+                            if positions_array.shape[1] >= 3:
+                                st.subheader("Movement Analysis")
+                                
+                                # Calculate actual movement vs required movement
+                                start_pos = positions_array[0]
+                                end_pos = positions_array[-1]
+                                actual_movement = end_pos - start_pos
+                                
+                                # Get target if available
+                                target_movement = None
+                                if last_results.get("reference_trajectory") is not None:
+                                    ref_traj = last_results["reference_trajectory"]
+                                    if len(ref_traj) > 0:
+                                        target_pos = ref_traj[-1]
+                                        target_movement = target_pos - start_pos
+                                
+                                col1, col2 = st.columns(2)
+                                
+                                with col1:
+                                    # Movement comparison
+                                    movement_fig = go.Figure()
+                                    
+                                    if target_movement is not None:
+                                        movement_fig.add_trace(go.Bar(
+                                            x=['X', 'Y', 'Z'],
+                                            y=target_movement,
+                                            name='Required Movement',
+                                            marker_color='red',
+                                            opacity=0.7
+                                        ))
+                                    
+                                    movement_fig.add_trace(go.Bar(
+                                        x=['X', 'Y', 'Z'],
+                                        y=actual_movement,
+                                        name='Actual Movement',
+                                        marker_color='blue',
+                                        opacity=0.7
+                                    ))
+                                    
+                                    movement_fig.update_layout(
+                                        title="Required vs Actual Movement",
+                                        xaxis_title="Axis",
+                                        yaxis_title="Distance",
+                                        barmode='group',
+                                        height=300
+                                    )
+                                    st.plotly_chart(movement_fig, use_container_width=True, key="movement_comparison")
+                                
+                                with col2:
+                                    # Movement efficiency metrics
+                                    total_distance = np.sum(np.linalg.norm(np.diff(positions_array, axis=0), axis=1))
+                                    direct_distance = np.linalg.norm(actual_movement)
+                                    efficiency = direct_distance / total_distance if total_distance > 0 else 0
+                                    
+                                    st.metric("Movement Efficiency", f"{efficiency:.3f}")
+                                    st.metric("Total Distance", f"{total_distance:.2f}")
+                                    st.metric("Direct Distance", f"{direct_distance:.2f}")
+                                    
+                                    # Show which axis had largest movement requirement vs achievement
+                                    if target_movement is not None:
+                                        required_magnitudes = np.abs(target_movement)
+                                        actual_magnitudes = np.abs(actual_movement)
+                                        
+                                        axis_names = ['X', 'Y', 'Z']
+                                        largest_required = np.argmax(required_magnitudes)
+                                        largest_actual = np.argmax(actual_magnitudes)
+                                        
+                                        st.write("**Movement Analysis:**")
+                                        st.write(f"• Largest required: {axis_names[largest_required]}-axis ({required_magnitudes[largest_required]:.2f})")
+                                        st.write(f"• Largest achieved: {axis_names[largest_actual]}-axis ({actual_magnitudes[largest_actual]:.2f})")
+                                        
+                                        # Check if the model struggled with a particular axis
+                                        achievement_ratios = actual_magnitudes / (required_magnitudes + 1e-6)
+                                        worst_axis = np.argmin(achievement_ratios)
+                                        st.write(f"• Weakest performance: {axis_names[worst_axis]}-axis ({achievement_ratios[worst_axis]:.2f} ratio)")
 
                 if last_results.get("frames"):
                     st.subheader("Flight Video")
