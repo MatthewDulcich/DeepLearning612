@@ -37,7 +37,7 @@ except ImportError:
 
 from src.drone_rl.models.transformer_policy import TransformerActorCritic
 from src.drone_rl.models.baselines import SimpleLSTMPolicy, DronePositionController
-from src.drone_rl.utils.metrics import time_to_collision, path_deviation, velocity_error
+from src.drone_rl.utils.metrics import time_to_collision
 from src.drone_rl.utils.model_compatibility import load_model_with_compatibility
 from stable_baselines3 import PPO
 
@@ -107,8 +107,6 @@ class RunRecord:
     velocities: list
     rewards: list
     ttc: list
-    path_dev: list
-    vel_error: list
     reference_trajectory: list | None
     video_path: str | None
 
@@ -316,9 +314,7 @@ def display_metrics(metrics: Dict[str, float]) -> None:
             status = "success"
             if name == "TTC (s)" and value < 3.0:
                 status = "danger"
-            elif name == "Path Dev (m)" and value > 0.5:
-                status = "warning"
-            elif name == "Vel Error (%)" and value > 15.0:
+            elif name == "TTC (s)" and value < 10.0:
                 status = "warning"
 
             val_str = "∞" if (isinstance(value, float) and not np.isfinite(value)) else f"{value:.2f}"
@@ -344,24 +340,6 @@ def display_metrics_explanation():
         - **∞ (Infinity):** No collision detected on current path
         
         *This is a critical safety metric - the drone must maintain sufficient TTC to react to obstacles.*
-        
-        ### Path Deviation (Path Dev)
-        **What it measures:** The average distance in meters between the drone's actual flight path and the optimal reference trajectory.
-        
-        - **Excellent:** < 0.2m (very precise)
-        - **Good:** 0.2-0.5m (acceptable accuracy)
-        - **Poor:** > 0.5m (significant deviation)
-        
-        *Lower values indicate better trajectory following and navigation precision.*
-        
-        ### Velocity Error (Vel Error)
-        **What it measures:** The percentage difference between the drone's actual velocity and the desired target velocity.
-        
-        - **Excellent:** < 5% (very accurate speed control)
-        - **Good:** 5-15% (acceptable control)
-        - **Poor:** > 15% (poor speed management)
-        
-        *This measures how well the drone maintains the required flight speed.*
         
         ### Average Reward
         **What it measures:** The mean reward signal from the reinforcement learning environment, indicating overall mission performance.
@@ -524,8 +502,6 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
         "actions": [],
         "rewards": [],
         "ttc": [],
-        "path_dev": [],
-        "vel_error": [],
         "attention": [] if hasattr(model, "policy") and hasattr(model.policy, "get_attention_weights") else None,
     }
 
@@ -551,19 +527,6 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
         results["ttc"].append(ttc0)
     else:
         results["ttc"].append(float("inf"))
-
-    reference_trajectory = info.get("reference_trajectory", None)
-    if reference_trajectory is not None:
-        dev0, _ = path_deviation(np.array(results["positions"]), reference_trajectory[:1])
-        results["path_dev"].append(dev0)
-    else:
-        results["path_dev"].append(0.0)
-
-    if "target_velocity" in info:
-        vel_err0 = velocity_error(init_vel, info["target_velocity"], relative=True) * 100.0
-        results["vel_error"].append(vel_err0)
-    else:
-        results["vel_error"].append(0.0)
     
     # Run simulation
     done = False
@@ -716,7 +679,7 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
                         print(f"DEBUG: Required movement [x,y,z]: {movement_required}")
                         print(f"DEBUG: Largest movement dimension: {np.argmax(np.abs(movement_required))} ({'x' if np.argmax(np.abs(movement_required))==0 else 'y' if np.argmax(np.abs(movement_required))==1 else 'z'})")
         
-        # Compute metrics
+        # Compute TTC metric
         if "obstacles" in info and len(info["obstacles"]) > 0:
             ttc_val, _ = time_to_collision(
                 info["drone_position"],
@@ -727,25 +690,6 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
             results["ttc"].append(ttc_val)
         else:
             results["ttc"].append(float("inf"))
-        
-        if reference_trajectory is not None:
-            dev, _ = path_deviation(
-                np.array(results["positions"]),
-                reference_trajectory[:len(results["positions"])]
-            )
-            results["path_dev"].append(dev)
-        else:
-            results["path_dev"].append(0.0)
-        
-        if "target_velocity" in info:
-            vel_err = velocity_error(
-                info["drone_velocity"],
-                info["target_velocity"],
-                relative=True
-            ) * 100.0  # Convert to percentage
-            results["vel_error"].append(vel_err)
-        else:
-            results["vel_error"].append(0.0)
         
         # Capture attention weights if available
         if results["attention"] is not None and hasattr(model.policy, "get_attention_weights"):
@@ -772,8 +716,6 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
     results["actions"] = np.array(results["actions"])
     results["rewards"] = np.array(results["rewards"])
     results["ttc"] = np.array(results["ttc"])
-    results["path_dev"] = np.array(results["path_dev"])
-    results["vel_error"] = np.array(results["vel_error"])
     
     # Debug position data
     print(f"DEBUG: Final positions shape: {results['positions'].shape}")
@@ -787,7 +729,7 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
     # Try both possible success keys from environment
     results["success"] = info.get("success", info.get("is_success", False))
     results["steps"] = step + 1
-    results["reference_trajectory"] = reference_trajectory
+    results["reference_trajectory"] = None  # Not available in FlyCraft
     
     # Analyze action patterns to understand model behavior
     actions_array = np.array(results["actions"])
@@ -973,15 +915,11 @@ def main():
                             "steps": int(results["steps"]),
                             "success": bool(results["success"]),
                             "mean_ttc": float(np.nanmean(results["ttc"])) if np.isfinite(results["ttc"]).any() else float("inf"),
-                            "mean_path_dev": float(np.mean(results["path_dev"])),
-                            "mean_vel_error_pct": float(np.mean(results["vel_error"])),
                         },
                         positions=results["positions"].tolist(),
                         velocities=results["velocities"].tolist(),
                         rewards=results["rewards"].tolist(),
                         ttc=results["ttc"].tolist(),
-                        path_dev=results["path_dev"].tolist(),
-                        vel_error=results["vel_error"].tolist(),
                         reference_trajectory=(results["reference_trajectory"].tolist() if results["reference_trajectory"] is not None else None),
                         video_path=None,
                     )
@@ -1027,8 +965,6 @@ def main():
                 st.subheader("Flight Metrics")
                 metrics = {
                     "TTC (s)": np.mean(last_results["ttc"]) if np.isfinite(last_results["ttc"]).any() else float("inf"),
-                    "Path Dev (m)": np.mean(last_results["path_dev"]),
-                    "Vel Error (%)": np.mean(last_results["vel_error"]),
                     "Avg Reward": np.mean(last_results["rewards"]),
                 }
                 display_metrics(metrics)
@@ -1046,14 +982,10 @@ def main():
                     metrics_df = pd.DataFrame({
                         "Step": np.arange(len(last_results["ttc"])),
                         "TTC (s)": np.clip(last_results["ttc"], 0, 10),
-                        "Path Deviation (m)": last_results["path_dev"],
-                        "Velocity Error (%)": last_results["vel_error"],
                         "Reward": last_results["rewards"],
                     })
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["TTC (s)"], mode="lines", name="TTC (s)"))
-                    fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Path Deviation (m)"], mode="lines", name="Path Dev (m)"))
-                    fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Velocity Error (%)"], mode="lines", name="Vel Error (%)"))
                     fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Reward"], mode="lines", name="Reward"))
                     fig.update_layout(xaxis_title="Simulation Step", yaxis_title="Value", legend=dict(x=0, y=1, orientation="h"), margin=dict(l=0, r=0, b=0, t=30), height=400)
                     st.plotly_chart(fig, use_container_width=True, key="training_metrics")
@@ -1254,8 +1186,6 @@ def main():
                     "positions": np.array(rec.positions),
                     "reference_trajectory": (np.array(rec.reference_trajectory) if rec.reference_trajectory is not None else None),
                     "ttc": np.array(rec.ttc),
-                    "path_dev": np.array(rec.path_dev),
-                    "vel_error": np.array(rec.vel_error),
                     "rewards": np.array(rec.rewards),
                     "success": bool(rec.metrics.get("success", False)),
                     "steps": int(rec.metrics.get("steps", len(rec.rewards))),
@@ -1272,8 +1202,6 @@ def main():
                 st.subheader("Flight Metrics")
                 metrics = {
                     "TTC (s)": np.mean(results["ttc"]) if np.isfinite(results["ttc"]).any() else float("inf"),
-                    "Path Dev (m)": np.mean(results["path_dev"]),
-                    "Vel Error (%)": np.mean(results["vel_error"]),
                     "Avg Reward": np.mean(results["rewards"]),
                 }
                 display_metrics(metrics)
@@ -1299,8 +1227,6 @@ def main():
                     metrics_df = pd.DataFrame({
                         "Step": np.arange(len(results["ttc"])),
                         "TTC (s)": np.clip(results["ttc"], 0, 10),
-                        "Path Deviation (m)": results["path_dev"],
-                        "Velocity Error (%)": results["vel_error"],
                         "Reward": results["rewards"],
                     })
                     
@@ -1310,16 +1236,6 @@ def main():
                     metrics_fig.add_trace(go.Scatter(
                         x=metrics_df["Step"], y=metrics_df["TTC (s)"],
                         mode="lines", name="TTC (s)", line=dict(color="green")
-                    ))
-                    
-                    metrics_fig.add_trace(go.Scatter(
-                        x=metrics_df["Step"], y=metrics_df["Path Deviation (m)"],
-                        mode="lines", name="Path Dev (m)", line=dict(color="blue")
-                    ))
-                    
-                    metrics_fig.add_trace(go.Scatter(
-                        x=metrics_df["Step"], y=metrics_df["Velocity Error (%)"],
-                        mode="lines", name="Vel Error (%)", line=dict(color="orange")
                     ))
                     
                     metrics_fig.add_trace(go.Scatter(
@@ -1372,7 +1288,8 @@ def main():
 
         **Key metrics:**
         - Time-to-Collision (TTC) > 3s (safety)
-        - Path Deviation < 0.5m (accuracy)
+        - Average Reward (performance indicator)
+        - Success Rate (mission completion)
         - Inference Latency < 10ms (real-time capability)
         """)
 
