@@ -388,7 +388,31 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
         elif hasattr(plane_state, '__len__'):
             print(f"DEBUG: plane_state length: {len(plane_state)}")
         
-        if hasattr(plane_state, 'shape') and len(plane_state) >= 3:
+        # Handle dictionary plane_state
+        if isinstance(plane_state, dict):
+            print(f"DEBUG: plane_state keys: {list(plane_state.keys())}")
+            # Look for common position keys in FlyCraft
+            position_keys = ['x', 'y', 'z', 'pos_x', 'pos_y', 'pos_z', 'position']
+            pos_values = []
+            for key in position_keys:
+                if key in plane_state:
+                    pos_values.append(plane_state[key])
+                    print(f"DEBUG: Found {key}: {plane_state[key]}")
+            
+            if len(pos_values) >= 3:
+                init_pos = np.array(pos_values[:3])
+                print(f"DEBUG: Using position from plane_state dict: {init_pos}")
+            else:
+                # Try to extract from first 3 values if they exist
+                values = list(plane_state.values())
+                if len(values) >= 3:
+                    try:
+                        init_pos = np.array([float(v) for v in values[:3]])
+                        print(f"DEBUG: Using first 3 values from plane_state: {init_pos}")
+                    except (ValueError, TypeError):
+                        print(f"DEBUG: Could not convert first 3 values to float")
+        
+        elif hasattr(plane_state, 'shape') and len(plane_state) >= 3:
             # Position is typically the first 3 elements in plane state
             init_pos = plane_state[:3]
             print(f"DEBUG: Using position from plane_state: {init_pos}")
@@ -515,7 +539,33 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
             # Check info first
             if "plane_state" in info:
                 plane_state = info["plane_state"]
-                if hasattr(plane_state, 'shape') and len(plane_state) >= 3:
+                
+                # Handle dictionary plane_state
+                if isinstance(plane_state, dict):
+                    # Look for common position keys in FlyCraft
+                    position_keys = ['x', 'y', 'z', 'pos_x', 'pos_y', 'pos_z', 'position']
+                    pos_values = []
+                    for key in position_keys:
+                        if key in plane_state:
+                            pos_values.append(plane_state[key])
+                    
+                    if len(pos_values) >= 3:
+                        drone_pos = np.array(pos_values[:3])
+                        if step < 3:
+                            print(f"DEBUG Step {step}: Extracted position from info plane_state dict: {drone_pos}")
+                    else:
+                        # Try to extract from first 3 values if they exist
+                        values = list(plane_state.values())
+                        if len(values) >= 3:
+                            try:
+                                drone_pos = np.array([float(v) for v in values[:3]])
+                                if step < 3:
+                                    print(f"DEBUG Step {step}: Using first 3 values from info plane_state: {drone_pos}")
+                            except (ValueError, TypeError):
+                                if step < 3:
+                                    print(f"DEBUG Step {step}: Could not convert first 3 values to float")
+                
+                elif hasattr(plane_state, 'shape') and len(plane_state) >= 3:
                     drone_pos = plane_state[:3]
                     if step < 3:
                         print(f"DEBUG Step {step}: Extracted position from info plane_state: {drone_pos}")
@@ -524,10 +574,25 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
                     drone_pos = np.array(plane_state[:3])
                     if step < 3:
                         print(f"DEBUG Step {step}: Extracted position from info plane_state (list): {drone_pos}")
+            
             # Check obs if still None
             elif isinstance(obs, dict) and "plane_state" in obs:
                 plane_state = obs["plane_state"]
-                if hasattr(plane_state, 'shape') and len(plane_state) >= 3:
+                
+                # Handle dictionary plane_state
+                if isinstance(plane_state, dict):
+                    position_keys = ['x', 'y', 'z', 'pos_x', 'pos_y', 'pos_z', 'position']
+                    pos_values = []
+                    for key in position_keys:
+                        if key in plane_state:
+                            pos_values.append(plane_state[key])
+                    
+                    if len(pos_values) >= 3:
+                        drone_pos = np.array(pos_values[:3])
+                        if step < 3:
+                            print(f"DEBUG Step {step}: Extracted position from obs plane_state dict: {drone_pos}")
+                
+                elif hasattr(plane_state, 'shape') and len(plane_state) >= 3:
                     drone_pos = plane_state[:3]
                     if step < 3:
                         print(f"DEBUG Step {step}: Extracted position from obs plane_state: {drone_pos}")
@@ -1017,28 +1082,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-    
-# /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/gymnasium/envs/registration.py:527: UserWarning: WARN: Using the latest versioned environment `FlyCraft-v0` instead of the unversioned environment `FlyCraft`.
-#   logger.warn(
-# load config from: /home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/flycraft/configs/NMR.json
-# Wrapping the env with a `Monitor` wrapper
-# Wrapping the env in a DummyVecEnv.
-# DEBUG: Initial info keys: ['plane_state']
-# DEBUG: Initial obs type: <class 'dict'>
-# DEBUG: Initial obs keys: ['observation', 'achieved_goal', 'desired_goal']
-# DEBUG: Initial position from info: [0. 0. 0.]
-# DEBUG: plane_state type: <class 'dict'>
-# DEBUG: plane_state length: 27
-# 2025-08-13 22:27:45.262 Uncaught app execution
-# Traceback (most recent call last):
-#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 128, in exec_func_with_error_handling
-#     result = func()
-#   File "/home/mrdulcich/miniconda3/envs/drone-rl/lib/python3.10/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 669, in code_to_exec
-#     exec(code, module.__dict__)  # noqa: S102
-#   File "/home/mrdulcich/Desktop/DeepLearning612/demo/app.py", line 1018, in <module>
-#     main()
-#   File "/home/mrdulcich/Desktop/DeepLearning612/demo/app.py", line 766, in main
-#     results = run_simulation(model, env, config, seed=seed)
-#   File "/home/mrdulcich/Desktop/DeepLearning612/demo/app.py", line 397, in run_simulation
-#     init_pos = np.array(plane_state[:3])
-# TypeError: unhashable type: 'slice'
