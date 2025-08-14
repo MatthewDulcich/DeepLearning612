@@ -279,13 +279,15 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
         features_dim: int = 128,
         lstm_hidden: int = 256,
         num_layers: int = 2,
-        dropout: float = 0.1
+        dropout: float = 0.1,
+        n_envs: int = 1
     ):
         super().__init__(observation_space, features_dim)
         # Flatten all obs into a single vector
         input_dim = sum([np.prod(space.shape) for space in observation_space.spaces.values()])
         self.lstm_hidden = lstm_hidden
         self.num_layers = num_layers
+        self.n_envs = n_envs
 
         self.lstm = nn.LSTM(
             input_dim,
@@ -296,6 +298,27 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
         )
         self.linear = nn.Linear(lstm_hidden, features_dim)
 
+        # Hidden state buffer for each env
+        self._hidden_state = None
+        self.reset_hidden(n_envs)
+
+    def reset_hidden(self, n_envs: int = None, done_mask: np.ndarray = None):
+        """Reset hidden state for all or only done envs."""
+        n_envs = n_envs or self.n_envs
+        device = next(self.lstm.parameters()).device
+        if self._hidden_state is None or self._hidden_state[0].shape[1] != n_envs:
+            # Init all
+            h = torch.zeros(self.num_layers, n_envs, self.lstm_hidden, device=device)
+            c = torch.zeros(self.num_layers, n_envs, self.lstm_hidden, device=device)
+            self._hidden_state = (h, c)
+        elif done_mask is not None:
+            # Only reset done envs
+            for idx, done in enumerate(done_mask):
+                if done:
+                    self._hidden_state[0][:, idx].zero_()
+                    self._hidden_state[1][:, idx].zero_()
+
+
     def forward(self, observations: dict) -> torch.Tensor:
         # Flatten dict obs to a single vector per sample
         x = torch.cat([v.float().view(v.shape[0], -1) for v in observations.values()], dim=1)
@@ -305,11 +328,12 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
         batch_size = x.size(0)
         device = x.device
 
-        # Always initialize hidden state for stateless feature extractor
-        h0 = torch.zeros(self.num_layers, batch_size, self.lstm_hidden, device=device)
-        c0 = torch.zeros(self.num_layers, batch_size, self.lstm_hidden, device=device)
-
-        lstm_out, _ = self.lstm(x, (h0, c0))  # lstm_out: [batch, seq, lstm_hidden]
+        # Use or expand hidden state buffer
+        if self._hidden_state is None or self._hidden_state[0].shape[1] != batch_size:
+            self.reset_hidden(batch_size)
+        h, c = self._hidden_state
+        lstm_out, (h_new, c_new) = self.lstm(x, (h, c))  # lstm_out: [batch, seq, lstm_hidden]
+        self._hidden_state = (h_new.detach(), c_new.detach())
         # Take the last output in the sequence
         features = lstm_out[:, -1, :]
         return self.linear(features)
@@ -328,6 +352,7 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         lstm_hidden: int = 256,
         lstm_layers: int = 2,
         dropout: float = 0.1,
+        n_envs: int = 1,
         **kwargs: Any
     ):
         """Initialize LSTM policy.
@@ -342,6 +367,8 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
             Number of LSTM layers
         dropout : float
             Dropout probability
+        n_envs : int
+            Number of parallel environments
         **kwargs : Any
             Keyword arguments for parent class
         """
@@ -350,7 +377,8 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
             "features_dim": 128,
             "lstm_hidden": lstm_hidden,
             "num_layers": lstm_layers,
-            "dropout": dropout
+            "dropout": dropout,
+            "n_envs": n_envs
         }
         kwargs.setdefault("features_extractor_class", LSTMFeatureExtractor)
         kwargs.setdefault("features_extractor_kwargs", features_kwargs)
@@ -473,7 +501,7 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         values = self.value_net(features).flatten()
         return values, log_prob, entropy
     
-    def reset_hidden(self) -> None:
-        """Reset LSTM hidden state between episodes."""
+    def reset_hidden(self, n_envs: int = None, done_mask: np.ndarray = None) -> None:
+        """Reset LSTM hidden state between episodes or for done envs."""
         if hasattr(self.features_extractor, "reset_hidden"):
-            self.features_extractor.reset_hidden()
+            self.features_extractor.reset_hidden(n_envs=n_envs, done_mask=done_mask)
