@@ -272,7 +272,7 @@ class DronePositionController:
 
 class LSTMFeatureExtractor(BaseFeaturesExtractor):
     """LSTM-based feature extractor for sequential observations."""
-    
+
     def __init__(
         self,
         observation_space: spaces.Dict,
@@ -281,100 +281,38 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
         num_layers: int = 2,
         dropout: float = 0.1
     ):
-        """Initialize LSTM feature extractor.
-        
-        Parameters
-        ----------
-        observation_space : spaces.Dict
-            Observation space (expects dictionary of arrays)
-        features_dim : int
-            Output feature dimension
-        lstm_hidden : int
-            Hidden size of LSTM layers
-        num_layers : int
-            Number of LSTM layers
-        dropout : float
-            Dropout probability between LSTM layers
-        """
-        super().__init__(observation_space, features_dim=features_dim)
-        
-        # Determine input size from observation space
-        self.input_size = 0
-        for space in observation_space.values():
-            if isinstance(space, spaces.Box):
-                self.input_size += int(np.prod(space.shape))
-            else:
-                raise ValueError(f"Unsupported observation space: {space}")
-        
-        # LSTM layers
+        super().__init__(observation_space, features_dim)
+        # Flatten all obs into a single vector
+        input_dim = sum([np.prod(space.shape) for space in observation_space.spaces.values()])
+        self.lstm_hidden = lstm_hidden
+        self.num_layers = num_layers
+
         self.lstm = nn.LSTM(
-            input_size=self.input_size,
-            hidden_size=lstm_hidden,
+            input_dim,
+            lstm_hidden,
             num_layers=num_layers,
             batch_first=True,
-            dropout=dropout if num_layers > 1 else 0
+            dropout=dropout if num_layers > 1 else 0.0,
         )
-        
-        # Output projection
-        self.fc = nn.Sequential(
-            nn.Linear(lstm_hidden, features_dim),
-            nn.ReLU()
-        )
-        
-        # Hidden state for recurrent processing
-        self.hidden = None
-    
-    def forward(self, observations: Dict[str, torch.Tensor]) -> torch.Tensor:
-        """Process observations through LSTM.
-        
-        Parameters
-        ----------
-        observations : Dict[str, torch.Tensor]
-            Dictionary of observation tensors
-            
-        Returns
-        -------
-        torch.Tensor
-            Extracted features
-        """
-        # Flatten and concatenate all observation components
-        features = []
-        for k in sorted(observations.keys()):
-            obs = observations[k]
-            if len(obs.shape) > 3:  # Handle image-like observations
-                b, seq, *spatial = obs.shape
-                obs = obs.reshape(b, seq, -1)
-            features.append(obs)
-        
-        x = torch.cat(features, dim=-1)  # [batch_size, seq_len, input_size]
-        
-        # Process through LSTM
-        if self.hidden is None or x.size(0) != self.hidden[0].size(1):
-            # Initialize hidden state if needed
-            self.reset_hidden(batch_size=x.size(0), device=x.device)
-        
-        lstm_out, self.hidden = self.lstm(x, self.hidden)
-        
-        # Use last timestep output
-        last_output = lstm_out[:, -1]
-        
-        # Project to output dimension
-        return self.fc(last_output)
-    
-    def reset_hidden(self, batch_size: int = 1, device: torch.device = torch.device("cpu")) -> None:
-        """Reset LSTM hidden state.
-        
-        Parameters
-        ----------
-        batch_size : int
-            Batch size for hidden state
-        device : torch.device
-            Device for hidden state tensors
-        """
-        # Initialize hidden state (h0, c0)
-        h0 = torch.zeros(self.lstm.num_layers, batch_size, self.lstm.hidden_size, device=device)
-        c0 = torch.zeros(self.lstm.num_layers, batch_size, self.lstm.hidden_size, device=device)
-        self.hidden = (h0, c0)
+        self.linear = nn.Linear(lstm_hidden, features_dim)
+
+    def forward(self, observations: dict) -> torch.Tensor:
+        # Flatten dict obs to a single vector per sample
+        x = torch.cat([v.float().view(v.shape[0], -1) for v in observations.values()], dim=1)
+        # Add sequence dimension if missing (SB3 usually provides [batch, features])
+        if x.dim() == 2:
+            x = x.unsqueeze(1)  # [batch, seq=1, features]
+        batch_size = x.size(0)
+        device = x.device
+
+        # Always initialize hidden state for stateless feature extractor
+        h0 = torch.zeros(self.num_layers, batch_size, self.lstm_hidden, device=device)
+        c0 = torch.zeros(self.num_layers, batch_size, self.lstm_hidden, device=device)
+
+        lstm_out, _ = self.lstm(x, (h0, c0))  # lstm_out: [batch, seq, lstm_hidden]
+        # Take the last output in the sequence
+        features = lstm_out[:, -1, :]
+        return self.linear(features)
 
 
 class SimpleLSTMPolicy(ActorCriticPolicy):
@@ -522,23 +460,17 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
             Values, log probabilities, and entropy
         """
         features = self.extract_features(obs)
-        
-        # Compute values
-        values = self.value_net(features).flatten()
-        
-        # Get action distribution
-        if isinstance(self.action_space, spaces.Discrete):
-            logits = self.action_net(features)
-            dist = self.action_dist.proba_distribution(action_logits=logits)
-        else:  # Continuous actions
-            mean_actions = self.action_mean(features)
-            log_std = self.action_log_std.expand_as(mean_actions)
-            dist = self.action_dist.proba_distribution(mean_actions, log_std)
-        
-        # Compute log probabilities and entropy
+        mean_actions = self.action_mean(features)
+        log_std = self.action_log_std.expand_as(mean_actions)
+        dist = self.action_dist.proba_distribution(mean_actions, log_std)
         log_prob = dist.log_prob(actions)
+        # Fix: sum log_prob across action dim if needed
+        if log_prob.ndim == 2:
+            log_prob = log_prob.sum(axis=1)
         entropy = dist.entropy()
-        
+        if entropy.ndim == 2:
+            entropy = entropy.sum(axis=1)
+        values = self.value_net(features).flatten()
         return values, log_prob, entropy
     
     def reset_hidden(self) -> None:
