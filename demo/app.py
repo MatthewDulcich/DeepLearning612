@@ -121,6 +121,20 @@ def save_run(record: RunRecord) -> str:
 def load_run(json_path: str) -> RunRecord:
     with open(json_path) as f:
         data = json.load(f)
+    
+    # Handle backward compatibility - remove fields that no longer exist
+    if 'path_dev' in data:
+        del data['path_dev']
+    if 'vel_error' in data:
+        del data['vel_error']
+    
+    # Handle metrics backward compatibility
+    if 'metrics' in data and isinstance(data['metrics'], dict):
+        metrics = data['metrics']
+        # Remove deprecated metric fields
+        metrics.pop('mean_path_dev', None)
+        metrics.pop('mean_vel_error_pct', None)
+    
     return RunRecord(**data)
 
 # Cache model loading to avoid reloading on every interaction
