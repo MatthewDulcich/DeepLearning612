@@ -382,11 +382,20 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
     # Try to extract position from plane_state in info
     if np.allclose(init_pos, 0) and "plane_state" in info:
         plane_state = info["plane_state"]
-        print(f"DEBUG: plane_state shape/type: {type(plane_state)}, {getattr(plane_state, 'shape', 'no shape')}")
+        print(f"DEBUG: plane_state type: {type(plane_state)}")
+        if hasattr(plane_state, 'shape'):
+            print(f"DEBUG: plane_state shape: {plane_state.shape}")
+        elif hasattr(plane_state, '__len__'):
+            print(f"DEBUG: plane_state length: {len(plane_state)}")
+        
         if hasattr(plane_state, 'shape') and len(plane_state) >= 3:
             # Position is typically the first 3 elements in plane state
             init_pos = plane_state[:3]
             print(f"DEBUG: Using position from plane_state: {init_pos}")
+        elif hasattr(plane_state, '__len__') and len(plane_state) >= 3:
+            # Handle case where plane_state is a list/tuple
+            init_pos = np.array(plane_state[:3])
+            print(f"DEBUG: Using position from plane_state (list): {init_pos}")
     
     # Try to extract from observation if available
     elif np.allclose(init_pos, 0) and isinstance(obs, dict) and "plane_state" in obs:
@@ -394,6 +403,9 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
         if hasattr(plane_state, 'shape') and len(plane_state) >= 3:
             init_pos = plane_state[:3]
             print(f"DEBUG: Using position from obs plane_state: {init_pos}")
+        elif hasattr(plane_state, '__len__') and len(plane_state) >= 3:
+            init_pos = np.array(plane_state[:3])
+            print(f"DEBUG: Using position from obs plane_state (list): {init_pos}")
 
     # Prepare result storage
     results = {
@@ -507,6 +519,11 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
                     drone_pos = plane_state[:3]
                     if step < 3:
                         print(f"DEBUG Step {step}: Extracted position from info plane_state: {drone_pos}")
+                elif hasattr(plane_state, '__len__') and len(plane_state) >= 3:
+                    # Handle case where plane_state is a list/tuple
+                    drone_pos = np.array(plane_state[:3])
+                    if step < 3:
+                        print(f"DEBUG Step {step}: Extracted position from info plane_state (list): {drone_pos}")
             # Check obs if still None
             elif isinstance(obs, dict) and "plane_state" in obs:
                 plane_state = obs["plane_state"]
@@ -514,10 +531,16 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
                     drone_pos = plane_state[:3]
                     if step < 3:
                         print(f"DEBUG Step {step}: Extracted position from obs plane_state: {drone_pos}")
+                elif hasattr(plane_state, '__len__') and len(plane_state) >= 3:
+                    drone_pos = np.array(plane_state[:3])
+                    if step < 3:
+                        print(f"DEBUG Step {step}: Extracted position from obs plane_state (list): {drone_pos}")
             
             # Fallback
             if drone_pos is None:
                 drone_pos = np.zeros(3)
+                if step < 3:
+                    print(f"DEBUG Step {step}: Using fallback zeros for position")
         
         results["positions"].append(drone_pos)
         results["velocities"].append(info.get("drone_velocity", np.zeros(3)))
@@ -585,9 +608,16 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
     
     # Add summary metrics
     results["total_reward"] = total_reward
-    results["success"] = info.get("success", False)
+    # Try both possible success keys from environment
+    results["success"] = info.get("success", info.get("is_success", False))
     results["steps"] = step + 1
     results["reference_trajectory"] = reference_trajectory
+    
+    # Debug success detection
+    print(f"DEBUG: Final info keys: {list(info.keys())}")
+    print(f"DEBUG: Success status: {results['success']}")
+    if "is_success" in info:
+        print(f"DEBUG: is_success value: {info['is_success']}")
     
     # Clear progress bar
     progress_bar.empty()
