@@ -195,7 +195,7 @@ def load_model(model_path: str, model_type: str = "transformer"):
         st.error(f"Error loading model: {e}")
         return None, None
 
-def create_trajectory_plot(positions: np.ndarray, reference: Optional[np.ndarray] = None) -> Figure:
+def create_trajectory_plot(positions: np.ndarray, reference: Optional[np.ndarray] = None, target_goal: Optional[np.ndarray] = None) -> Figure:
     """Create 3D trajectory visualization.
     
     Parameters
@@ -204,6 +204,8 @@ def create_trajectory_plot(positions: np.ndarray, reference: Optional[np.ndarray
         Array of drone positions [N, 3]
     reference : Optional[np.ndarray]
         Optional reference trajectory [M, 3]
+    target_goal : Optional[np.ndarray]
+        Optional target goal position [3,]
         
     Returns
     -------
@@ -237,7 +239,7 @@ def create_trajectory_plot(positions: np.ndarray, reference: Optional[np.ndarray
             )
         )
     
-    # Add start and end points
+    # Add start point
     fig.add_trace(
         go.Scatter3d(
             x=[positions[0, 0]],
@@ -249,6 +251,7 @@ def create_trajectory_plot(positions: np.ndarray, reference: Optional[np.ndarray
         )
     )
     
+    # Add end point (where drone actually ended up)
     fig.add_trace(
         go.Scatter3d(
             x=[positions[-1, 0]],
@@ -259,6 +262,31 @@ def create_trajectory_plot(positions: np.ndarray, reference: Optional[np.ndarray
             marker=dict(size=8, color="red"),
         )
     )
+    
+    # Add target goal if provided
+    if target_goal is not None and len(target_goal) >= 3:
+        fig.add_trace(
+            go.Scatter3d(
+                x=[target_goal[0]],
+                y=[target_goal[1]],
+                z=[target_goal[2]],
+                mode="markers",
+                name="Target Goal",
+                marker=dict(size=12, color="gold", symbol="star"),
+            )
+        )
+        
+        # Add line from end to target to show error
+        fig.add_trace(
+            go.Scatter3d(
+                x=[positions[-1, 0], target_goal[0]],
+                y=[positions[-1, 1], target_goal[1]],
+                z=[positions[-1, 2], target_goal[2]],
+                mode="lines",
+                name="Goal Error",
+                line=dict(color="orange", width=2, dash="dot"),
+            )
+        )
     
     # Update layout
     fig.update_layout(
@@ -516,6 +544,7 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
         "actions": [],
         "rewards": [],
         "ttc": [],
+        "target_goal": None,  # Store the target goal position
         "attention": [] if hasattr(model, "policy") and hasattr(model.policy, "get_attention_weights") else None,
     }
 
@@ -682,16 +711,27 @@ def run_simulation(model, env, config: Dict[str, Any], seed: Optional[int] = Non
                 print(f"DEBUG Step {step}: Action: {action} (type: {type(action).__name__})")
         
         # Track target information for analysis
-        if "desired_goal" in info:
+        if "desired_goal" in info and results["target_goal"] is None:
+            # Capture target goal on first occurrence
             desired_goal = info["desired_goal"]
-            if step == 0:
-                print(f"DEBUG: Desired goal: {desired_goal}")
-                if hasattr(desired_goal, '__len__') and len(desired_goal) >= 3:
-                    goal_diff = np.array(desired_goal[:3]) if init_pos is not None else None
-                    if goal_diff is not None and not np.allclose(init_pos, 0):
-                        movement_required = goal_diff - init_pos
-                        print(f"DEBUG: Required movement [x,y,z]: {movement_required}")
-                        print(f"DEBUG: Largest movement dimension: {np.argmax(np.abs(movement_required))} ({'x' if np.argmax(np.abs(movement_required))==0 else 'y' if np.argmax(np.abs(movement_required))==1 else 'z'})")
+            if hasattr(desired_goal, '__len__') and len(desired_goal) >= 3:
+                results["target_goal"] = np.array(desired_goal[:3])
+                print(f"DEBUG: Captured target goal: {results['target_goal']}")
+            elif step == 0:
+                print(f"DEBUG: desired_goal format: {type(desired_goal)}, value: {desired_goal}")
+        
+        # Also try target_position for PID controllers
+        if "target_position" in info and results["target_goal"] is None:
+            target_pos = info["target_position"]
+            if hasattr(target_pos, '__len__') and len(target_pos) >= 3:
+                results["target_goal"] = np.array(target_pos[:3])
+                print(f"DEBUG: Captured target position: {results['target_goal']}")
+        
+        # Debug initial movement analysis
+        if step == 0 and results["target_goal"] is not None:
+            movement_required = results["target_goal"] - init_pos
+            print(f"DEBUG: Required movement [x,y,z]: {movement_required}")
+            print(f"DEBUG: Distance to target: {np.linalg.norm(movement_required):.2f}m")
         
         # Compute TTC metric
         if "obstacles" in info and len(info["obstacles"]) > 0:
@@ -989,7 +1029,11 @@ def main():
                 col1, col2 = st.columns(2)
                 with col1:
                     st.subheader("3D Trajectory")
-                    traj_fig = create_trajectory_plot(last_results["positions"], last_results["reference_trajectory"])
+                    traj_fig = create_trajectory_plot(
+                        last_results["positions"], 
+                        last_results["reference_trajectory"],
+                        last_results.get("target_goal")
+                    )
                     st.plotly_chart(traj_fig, use_container_width=True, key="training_trajectory")
                 with col2:
                     st.subheader("Metrics Over Time")
@@ -1204,6 +1248,7 @@ def main():
                     "success": bool(rec.metrics.get("success", False)),
                     "steps": int(rec.metrics.get("steps", len(rec.rewards))),
                     "total_reward": float(rec.metrics.get("total_reward", np.sum(rec.rewards))),
+                    "target_goal": getattr(rec, 'target_goal', None),  # Backward compatibility
                     "frames": [],
                 }
                 
