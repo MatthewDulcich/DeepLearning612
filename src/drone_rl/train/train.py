@@ -56,7 +56,7 @@ except Exception:
 POLICIES: Dict[str, Any] = {
     "transformer": TransformerActorCritic,
     "lstm": SimpleLSTMPolicy,
-    "mlp": "MlpPolicy"
+    "mlp": "MultiInputPolicy"
 }
 if PERFORMER_AVAILABLE:
     POLICIES["performer"] = PerformerActorCritic
@@ -340,8 +340,11 @@ def main() -> None:
     fx_kwargs = policy_kwargs.get("features_extractor_kwargs", {})
     fx_kwargs.pop("use_spatio_temporal", None)
     policy_kwargs["features_extractor_kwargs"] = fx_kwargs
-    policy_kwargs.setdefault("transformer_kwargs", {})
-    policy_kwargs["transformer_kwargs"].setdefault("attn_backend", "torch")
+    if policy_name == "transformer":
+        policy_kwargs.setdefault("transformer_kwargs", {})
+        policy_kwargs["transformer_kwargs"].setdefault("attn_backend", "torch")
+    else:
+        policy_kwargs.pop("transformer_kwargs", None)
 
     # --------- PPO KWARGS ---------
     ppo_kwargs = cfg.get("ppo_kwargs", {})
