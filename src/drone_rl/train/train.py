@@ -56,6 +56,7 @@ except Exception:
 POLICIES: Dict[str, Any] = {
     "transformer": TransformerActorCritic,
     "lstm": SimpleLSTMPolicy,
+    "mlp": "MlpPolicy"
 }
 if PERFORMER_AVAILABLE:
     POLICIES["performer"] = PerformerActorCritic

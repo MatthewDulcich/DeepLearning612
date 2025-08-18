@@ -1,0 +1,37 @@
+# ─────────────────────────────────────────
+#   Baseline MLP Policy
+# ─────────────────────────────────────────
+env_id: FlyCraft-v0
+run_name: baseline_mlp
+output_dir: runs
+seed: 42
+
+# ───────── Parallel rollout settings ─────────
+n_envs: 8
+max_episode_steps: 1000
+
+# ───────── MLP policy ─────────
+policy: mlp
+policy_kwargs:
+  net_arch: [64, 64]
+
+
+# ───────── PPO hyper-parameters ─────────
+ppo_kwargs:
+  learning_rate: 3e-4
+  n_steps: 2048
+  batch_size: 64
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.0
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+# ───────── Training length ─────────
+timesteps: 1000000
+
+# ───────── Logging / checkpoints ─────────
+save_freq: 50_000
+eval_freq: 20_000
+n_eval_episodes: 10
