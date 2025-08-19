@@ -23,6 +23,7 @@ from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor, VecNorma
 from drone_rl.models.transformer_policy import TransformerActorCritic
 from drone_rl.models.baselines import SimpleLSTMPolicy, DronePositionController  # optional
 from drone_rl.utils.metrics import count_parameters, estimate_flops
+from drone_rl.train.ppo_with_mse import PPOWithMSE  # custom PPO with MSE loss
 
 # wandb optional
 try:
@@ -402,8 +403,49 @@ def main() -> None:
             preds = seq_predictor(embedding=emb[0].unsqueeze(0), initial_state=init_state.unsqueeze(0))
             return preds.cpu().numpy()[0][:horizon]
 
+        def get_seq_prediction_targets():
+            # This method should return (embedding, initial_state, target_sequence)
+            # Access the rollout buffer
+            buffer = model.rollout_buffer
+            if horizon is None:
+                horizon = cfg.get("prediction_horizon", 200)
+            # Get the number of available samples
+            n_samples = buffer.size()
+            if n_samples < batch_size:
+                batch_size = n_samples
+
+            # Randomly sample indices
+            idxs = np.random.choice(n_samples, batch_size, replace=False)
+
+            # Get observations and next states
+            obs_batch = buffer.observations[idxs]
+            # For sequence prediction, you may want to build sequences of future states
+            # This is a simple example for single-step prediction; for multi-step, you need to extract sequences
+            next_states_batch = []
+            for idx in idxs:
+                # Collect a sequence of future states for each sampled index
+                seq = []
+                for t in range(horizon):
+                    next_idx = idx + t
+                    if next_idx < n_samples:
+                        seq.append(_flatten_np(buffer.observations[next_idx]))
+                    else:
+                        # Pad with zeros or repeat last state if out of bounds
+                        seq.append(seq[-1] if seq else _flatten_np(buffer.observations[idx]))
+                next_states_batch.append(np.stack(seq, axis=0))
+            next_states_batch = np.stack(next_states_batch, axis=0)  # [batch, horizon, state_dim]
+
+            # Get embeddings and initial states
+            obs_tensor, _ = model.policy.obs_to_tensor(obs_batch)
+            emb_batch = model.policy.extract_features(obs_tensor)
+            init_state_batch = torch.stack([torch.from_numpy(_flatten_np(obs)) for obs in obs_batch], dim=0).float().to(emb_batch.device)
+            target_sequence = torch.from_numpy(next_states_batch).float().to(emb_batch.device)
+
+            return emb_batch, init_state_batch, target_sequence
+
         model.policy.state_predictor = seq_predictor
         model.policy.predict_next_states = predict_next_states  # type: ignore
+        model.policy.get_seq_prediction_targets = get_seq_prediction_targets
 
     # logger
     model.set_logger(configure(str(run_dir), ["stdout", "csv", "tensorboard"]))
