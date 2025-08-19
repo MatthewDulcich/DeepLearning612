@@ -363,7 +363,7 @@ def main() -> None:
     ppo_kwargs["target_kl"]     = None  # use clip only, or set e.g. 0.02 if you want auto-early-stop
 
     # --------- build model ---------
-    model = PPO(
+    model = PPOWithMSE(
         policy=policy_cls,
         env=train_env,
         tensorboard_log=str(run_dir / "tb"),
@@ -403,7 +403,7 @@ def main() -> None:
             preds = seq_predictor(embedding=emb[0].unsqueeze(0), initial_state=init_state.unsqueeze(0))
             return preds.cpu().numpy()[0][:horizon]
 
-        def get_seq_prediction_targets():
+        def get_seq_prediction_targets(batch_size=64, horizon=None):
             # This method should return (embedding, initial_state, target_sequence)
             # Access the rollout buffer
             buffer = model.rollout_buffer
@@ -418,7 +418,10 @@ def main() -> None:
             idxs = np.random.choice(n_samples, batch_size, replace=False)
 
             # Get observations and next states
-            obs_batch = buffer.observations[idxs]
+            obs_batch = []
+            for i in idxs:
+                obs_i = {k: v[i] for k, v in buffer.observations.items()}
+                obs_batch.append(obs_i)
             # For sequence prediction, you may want to build sequences of future states
             # This is a simple example for single-step prediction; for multi-step, you need to extract sequences
             next_states_batch = []
@@ -428,15 +431,22 @@ def main() -> None:
                 for t in range(horizon):
                     next_idx = idx + t
                     if next_idx < n_samples:
-                        seq.append(_flatten_np(buffer.observations[next_idx]))
+                        obs_at_next_idx = {k: v[next_idx] for k, v in buffer.observations.items()}
+                        seq.append(_flatten_np(obs_at_next_idx))
                     else:
                         # Pad with zeros or repeat last state if out of bounds
                         seq.append(seq[-1] if seq else _flatten_np(buffer.observations[idx]))
                 next_states_batch.append(np.stack(seq, axis=0))
             next_states_batch = np.stack(next_states_batch, axis=0)  # [batch, horizon, state_dim]
 
+            def stack_obs_list(obs_list):
+                # obs_list: list of dicts
+                keys = obs_list[0].keys()
+                return {k: np.stack([obs[k] for obs in obs_list], axis=0) for k in keys}
+
             # Get embeddings and initial states
-            obs_tensor, _ = model.policy.obs_to_tensor(obs_batch)
+            obs_batch_stacked = stack_obs_list(obs_batch)
+            obs_tensor, _ = model.policy.obs_to_tensor(obs_batch_stacked)
             emb_batch = model.policy.extract_features(obs_tensor)
             init_state_batch = torch.stack([torch.from_numpy(_flatten_np(obs)) for obs in obs_batch], dim=0).float().to(emb_batch.device)
             target_sequence = torch.from_numpy(next_states_batch).float().to(emb_batch.device)
