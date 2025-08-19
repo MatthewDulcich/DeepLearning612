@@ -403,7 +403,7 @@ def main() -> None:
             preds = seq_predictor(embedding=emb[0].unsqueeze(0), initial_state=init_state.unsqueeze(0))
             return preds.cpu().numpy()[0][:horizon]
 
-        def get_seq_prediction_targets(batch_size=64, horizon=None):
+        def get_seq_prediction_targets(batch_size=20, horizon=None):
             # This method should return (embedding, initial_state, target_sequence)
             # Access the rollout buffer
             buffer = model.rollout_buffer
@@ -415,15 +415,15 @@ def main() -> None:
                 batch_size = n_samples
 
             # Randomly sample indices
-            idxs = np.random.choice(n_samples, batch_size, replace=False)
+            idxs = np.arange(n_samples - batch_size, n_samples)
 
             # Get observations and next states
             obs_batch = []
             for i in idxs:
                 obs_i = {k: v[i] for k, v in buffer.observations.items()}
                 obs_batch.append(obs_i)
-            # For sequence prediction, you may want to build sequences of future states
-            # This is a simple example for single-step prediction; for multi-step, you need to extract sequences
+            
+            # This is an example for single-step prediction; for multi-step, you need to extract sequences
             next_states_batch = []
             for idx in idxs:
                 # Collect a sequence of future states for each sampled index
