@@ -403,53 +403,24 @@ def main() -> None:
             preds = seq_predictor(embedding=emb[0].unsqueeze(0), initial_state=init_state.unsqueeze(0))
             return preds.cpu().numpy()[0][:horizon]
 
-        def get_seq_prediction_targets(batch_size=20, horizon=None):
+        def get_seq_prediction_targets(batch_size=40):
             # This method should return (embedding, initial_state, target_sequence)
             # Access the rollout buffer
             buffer = model.rollout_buffer
-            if horizon is None:
-                horizon = cfg.get("prediction_horizon", 200)
             # Get the number of available samples
             n_samples = buffer.size()
             if n_samples < batch_size:
                 batch_size = n_samples
 
-            # Randomly sample indices
-            idxs = np.arange(n_samples - batch_size, n_samples)
-
-            # Get observations and next states
-            obs_batch = []
-            for i in idxs:
-                obs_i = {k: v[i] for k, v in buffer.observations.items()}
-                obs_batch.append(obs_i)
+            # Get the newest observations
+            obs_batch = buffer.get_recent_observations(batch_size)
+            # Split the batch in half
+            half = obs_batch.shape[1] // 2
+            init_state_batch = obs_batch[:, :half]
+            target_sequence = obs_batch[:, half:]
             
-            # This is an example for single-step prediction; for multi-step, you need to extract sequences
-            next_states_batch = []
-            for idx in idxs:
-                # Collect a sequence of future states for each sampled index
-                seq = []
-                for t in range(horizon):
-                    next_idx = idx + t
-                    if next_idx < n_samples:
-                        obs_at_next_idx = {k: v[next_idx] for k, v in buffer.observations.items()}
-                        seq.append(_flatten_np(obs_at_next_idx))
-                    else:
-                        # Pad with zeros or repeat last state if out of bounds
-                        seq.append(seq[-1] if seq else _flatten_np(buffer.observations[idx]))
-                next_states_batch.append(np.stack(seq, axis=0))
-            next_states_batch = np.stack(next_states_batch, axis=0)  # [batch, horizon, state_dim]
-
-            def stack_obs_list(obs_list):
-                # obs_list: list of dicts
-                keys = obs_list[0].keys()
-                return {k: np.stack([obs[k] for obs in obs_list], axis=0) for k in keys}
-
-            # Get embeddings and initial states
-            obs_batch_stacked = stack_obs_list(obs_batch)
-            obs_tensor, _ = model.policy.obs_to_tensor(obs_batch_stacked)
-            emb_batch = model.policy.extract_features(obs_tensor)
-            init_state_batch = torch.stack([torch.from_numpy(_flatten_np(obs)) for obs in obs_batch], dim=0).float().to(emb_batch.device)
-            target_sequence = torch.from_numpy(next_states_batch).float().to(emb_batch.device)
+            # Get the embeddings of the init_state_batch
+            emb_batch = model.policy.extract_features(init_state_batch)
 
             return emb_batch, init_state_batch, target_sequence
 

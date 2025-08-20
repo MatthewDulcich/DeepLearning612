@@ -52,7 +52,8 @@ Outputs: sharded Parquet files in `data/raw/` and a companion `metadata.json` wi
 
 ```bash
 python -m drone_rl.train.train \
-  --config configs/teacher_large.yaml \
+  --config configs/training/teacher_large.yaml \
+  --env_config configs/gymenv/env_config_for_ppo_easy.json \
   --wandb
 ```
 
@@ -114,13 +115,17 @@ Then open `http://localhost:8501` in your browser.
 ### 6.1 Load modules & build environment
 
 ```bash
-ssh <netid>@zaratan.umd.edu
-module load cuda/12.1  gcc/11.3
+ssh <netid>@login.zaratan.umd.edu
+module load cuda/12.3.0
 
 # create env in $SCRATCH to avoid home quota limits
 conda env create -f env.yml -p $SCRATCH/conda/envs/drone-rl
-conda activate $SCRATCH/conda/envs/drone-rl
+conda activate base
+conda install conda-pack
+conda-pack drone-rl
+conda deactivate
 ```
+At this point you can delete your miniconda installation in order to save space on scratch.
 
 ### 6.2 Submit jobs
 
