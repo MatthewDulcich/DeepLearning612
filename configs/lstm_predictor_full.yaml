@@ -42,10 +42,10 @@ prediction_horizon: 200
 
 # Curriculum settings for progression through frequencies
 goal_cfg_by_freq:
-  "10": {"type": "fixed_short", "distance_m": 200}
-  "20": {"type": "fixed_short", "distance_m": 300}  
-  "50": {"type": "fixed_medium", "distance_m": 500}
-  "100": {"type": "fixed_long", "distance_m": 800}
+  "10": {"type": "fixed_short", "distance_m": 150}    # Easier start
+  "20": {"type": "fixed_short", "distance_m": 250}    # Gradual increase
+  "50": {"type": "fixed_medium", "distance_m": 400}   # More challenging
+  "100": {"type": "fixed_long", "distance_m": 600}    # Advanced
 
 control_mode_by_freq:
   "10": "guidance_law_mode"

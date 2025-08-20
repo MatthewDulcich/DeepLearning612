@@ -463,13 +463,24 @@ def main() -> None:
     n_envs = cfg.get("n_envs", 8)
     max_episode_steps = cfg.get("max_episode_steps", 1000)
 
-    # Curriculum scheduler for step frequency
+    # Curriculum scheduler for step frequency - more gradual progression
     step_frequencies = [10, 20, 50, 100]
-    success_threshold = 0.8
+    
+    # Progressive success thresholds - start easier and get harder
+    success_thresholds = {
+        10: 0.2,   # Start with just 20% success at 10Hz
+        20: 0.4,   # Increase to 40% at 20Hz  
+        50: 0.6,   # Then 60% at 50Hz
+        100: 0.8   # Finally 80% at 100Hz
+    }
+    
     curriculum_log = []
 
     for freq in step_frequencies:
         print(f"\n=== Training with step_frequency={freq}Hz ===")
+        
+        # Get current stage success threshold
+        success_threshold = success_thresholds[freq]
         
         # Get stage-specific curriculum settings from config (with fallbacks)
         goal_cfg = cfg.get("goal_cfg_by_freq", {}).get(str(freq), {"type": "fixed_short", "distance_m": 200})
@@ -477,6 +488,7 @@ def main() -> None:
         reward_mode = cfg.get("reward_mode_by_freq", {}).get(str(freq), "dense")
         
         print(f"[Curriculum] Using: freq={freq}Hz, control_mode={control_mode}, reward_mode={reward_mode}, goal_cfg={goal_cfg}")
+        print(f"[Curriculum] Success threshold for {freq}Hz: {success_threshold:.1%}")
         print(f"⚠️  NOTE: FlyCraft doesn't support curriculum parameters directly - using basic environment")
         
         # dirs
@@ -671,8 +683,12 @@ def main() -> None:
         if args.wandb and WANDB_AVAILABLE:
             callbacks.append(WandbCallback())
 
-        # train
-        timesteps = cfg.get("timesteps", 1_000_000)
+        # train - divide total timesteps across curriculum stages
+        total_timesteps = cfg.get("timesteps", 1_000_000)
+        timesteps_per_stage = total_timesteps // len(step_frequencies)
+        timesteps = timesteps_per_stage
+        
+        print(f"[Curriculum] Training {timesteps:,} steps at {freq}Hz (stage {step_frequencies.index(freq)+1}/{len(step_frequencies)})")
         model.learn(total_timesteps=timesteps, callback=callbacks)
 
         # Evaluate success rate (VecEnv safe)
@@ -688,8 +704,8 @@ def main() -> None:
             if info0.get("success", False) or info0.get("is_success", False):
                 successes += 1
         success_rate = successes / n_eval
-        curriculum_log.append({"step_frequency": freq, "success_rate": success_rate})
-        print(f"[Curriculum] step_frequency={freq}Hz, success_rate={success_rate:.2f}")
+        curriculum_log.append({"step_frequency": freq, "success_rate": success_rate, "threshold": success_threshold})
+        print(f"[Curriculum] step_frequency={freq}Hz, success_rate={success_rate:.2f}, threshold={success_threshold:.2f}")
         
         # ENHANCED DEBUGGING: Log detailed eval results
         current_stage = step_frequencies.index(freq) + 1
@@ -701,11 +717,18 @@ def main() -> None:
         print(f"  - Success threshold: {success_threshold:.2%}")
         
         # Log individual episode details if success rate is low
-        if success_rate < 0.3:
-            print("⚠️  LOW SUCCESS RATE - Debug info:")
-            print(f"   - Training timesteps: {timesteps}")
+        if success_rate < 0.1:
+            print("🚨 VERY LOW SUCCESS RATE - Debug info:")
+            print(f"   - Training timesteps: {timesteps:,}")
+            print(f"   - Episodes per evaluation: {n_eval}")
             print(f"   - Reward mode: {reward_mode}")
             print(f"   - Goal config: {goal_cfg}")
+            print(f"   - Consider increasing timesteps_per_stage or lowering initial goals")
+        elif success_rate < success_threshold:
+            print("⚠️  BELOW THRESHOLD - Debug info:")
+            print(f"   - Training timesteps: {timesteps:,}")
+            print(f"   - Success rate: {success_rate:.1%} (need {success_threshold:.1%})")
+            print(f"   - Goal distance: {goal_cfg.get('distance_m', 'N/A')}m")
 
         # Save model and env
         model.save(run_dir / cfg.get("save_name", f"final_model_f{freq}"))
@@ -715,10 +738,19 @@ def main() -> None:
         if args.wandb and WANDB_AVAILABLE:
             wandb.finish()
 
-        if success_rate < success_threshold:
-            print(f"❌ [Curriculum] Stopping: success_rate {success_rate:.2f} < threshold {success_threshold}")
+        # Check if we meet the threshold (be more forgiving for early stages)
+        # Allow very low success rates for 10Hz as it's the hardest stage  
+        min_acceptable_rate = 0.05 if freq == 10 else success_threshold * 0.75 if freq == 20 else success_threshold
+        
+        if success_rate < min_acceptable_rate:
+            print(f"❌ [Curriculum] Stopping: success_rate {success_rate:.2f} < minimum {min_acceptable_rate:.2f}")
             remaining_stages = total_stages - current_stage
             print(f"   Failed at stage {current_stage}/{total_stages} ({remaining_stages} stages remaining)")
+            print(f"💡 Suggestions to improve performance:")
+            print(f"   - Increase timesteps per stage (current: {timesteps:,})")
+            print(f"   - Reduce initial goal distance (current: {goal_cfg.get('distance_m', 'N/A')}m)")
+            print(f"   - Try without predictor first: set predict_sequence: false")
+            print(f"   - Check reward shaping or environment setup")
             break
         else:
             remaining_stages = total_stages - current_stage

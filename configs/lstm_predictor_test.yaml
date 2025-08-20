@@ -39,3 +39,10 @@ n_eval_episodes: 5
 # Enable future predictor with small horizon for testing
 predict_sequence: true
 prediction_horizon: 5  # Start small, then scale to 200
+
+# Easier curriculum progression for early training
+goal_cfg_by_freq:
+  "10": {"type": "fixed_short", "distance_m": 100}   # Start easier
+  "20": {"type": "fixed_short", "distance_m": 150}   # Gradual increase  
+  "50": {"type": "fixed_short", "distance_m": 200}   # Standard
+  "100": {"type": "fixed_medium", "distance_m": 300} # More challenging

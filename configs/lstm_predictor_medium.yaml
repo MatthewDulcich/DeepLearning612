@@ -39,3 +39,10 @@ n_eval_episodes: 8
 # 50-step prediction horizon (good middle ground)
 predict_sequence: true
 prediction_horizon: 50
+
+# Balanced curriculum progression
+goal_cfg_by_freq:
+  "10": {"type": "fixed_short", "distance_m": 150}   # Reasonable start
+  "20": {"type": "fixed_short", "distance_m": 200}   # Standard
+  "50": {"type": "fixed_medium", "distance_m": 300}  # More challenging
+  "100": {"type": "fixed_medium", "distance_m": 400} # Advanced
