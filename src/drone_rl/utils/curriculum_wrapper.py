@@ -237,22 +237,42 @@ class FlyCraftCurriculumWrapper(gym.Wrapper):
         """Apply curriculum-specific reward modifications."""
         
         if self.reward_mode == "dense":
-            # Dense reward with distance-based shaping
+            # Enhanced dense reward with generous shaping for initial learning
             reward = original_reward
             
             # Add distance-based reward if positions available
             if self.current_distance_to_goal is not None and self.initial_distance_to_goal is not None:
-                # Progress reward: positive for getting closer
+                # Progress reward: generous positive for getting closer
                 if hasattr(self, '_previous_distance'):
                     distance_change = self._previous_distance - self.current_distance_to_goal
-                    progress_reward = distance_change * 0.1  # Scale factor
+                    progress_reward = distance_change * 0.5  # Increased scale factor
                     reward += progress_reward
+                    
+                    # Bonus for any progress at all
+                    if distance_change > 0:
+                        reward += 0.1  # Small bonus for any improvement
                 
-                # Distance penalty: small penalty for being far
-                distance_penalty = -self.current_distance_to_goal * 0.001
+                # Less harsh distance penalty
+                distance_penalty = -self.current_distance_to_goal * 0.0005  # Reduced penalty
                 reward += distance_penalty
                 
+                # Survival bonus - reward for staying alive
+                if not terminated and not truncated:
+                    reward += 0.01  # Small reward for each step survived
+                
+                # Large bonus for being reasonably close to target
+                if self.current_distance_to_goal < 100:  # Within 100m
+                    reward += 0.5
+                if self.current_distance_to_goal < 50:   # Within 50m  
+                    reward += 1.0
+                if self.current_distance_to_goal < 25:   # Within 25m
+                    reward += 2.0
+                
                 self._previous_distance = self.current_distance_to_goal
+            else:
+                # If no distance info, give small survival bonus
+                if not terminated and not truncated:
+                    reward += 0.01
             
             return reward
             

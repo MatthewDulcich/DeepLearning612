@@ -1,0 +1,48 @@
+# Baseline LSTM without predictor - for comparison
+env_id: FlyCraft-v0
+run_name: lstm_baseline_no_predictor
+output_dir: runs
+seed: 42
+
+# Training at single frequency (50Hz)
+frequency: 50  # Bypass curriculum
+
+# Small scale for rapid iteration  
+n_envs: 4
+max_episode_steps: 200  # Shorter episodes
+
+# LSTM policy - NO PREDICTOR
+policy: lstm
+policy_kwargs:
+  lstm_hidden: 128
+  lstm_layers: 2
+  dropout: 0.1
+
+# PPO settings optimized for sparse rewards
+ppo_kwargs:
+  n_steps: 256     
+  batch_size: 128  
+  n_epochs: 6      
+  learning_rate: 1.0e-3  # Higher learning rate
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.02   # Higher entropy for exploration
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+# Training duration 
+timesteps: 500_000  
+
+# Frequent monitoring
+save_freq: 25_000
+eval_freq: 12_500
+n_eval_episodes: 10
+
+# NO PREDICTOR - disable future prediction
+predict_sequence: false
+
+# EASY SETTINGS - same as predictor version for fair comparison
+goal_cfg: {"type": "fixed_short", "distance_m": 50}  # Short distance
+control_mode: "guidance_law_mode"
+reward_mode: "dense"
