@@ -138,103 +138,32 @@ def attach_future_targets_to_rollout_buffer(rollout_buffer, n_envs: int, n_steps
 
 
 class LSTMPredictorCallback(BaseCallback):
-    """Callback to train predictor head at rollout end using collected future states."""
+    """Callback to train LSTM future predictor as auxiliary task"""
     
-    def __init__(self, model, H, state_dim, max_samples=512, lr=1e-4, loss_weight=1.0, freeze_extractor=True):
-        super().__init__()
-        self.model = model
-        self.H = H
+    def __init__(self, policy, horizon: int, state_dim: int, 
+                 predictor_lr: float = 1e-4, max_samples: int = 512,
+                 freeze_extractor: bool = True, verbose: int = 0):
+        super().__init__(verbose)
+        self.policy = policy
+        self.horizon = horizon
         self.state_dim = state_dim
-        self.max_samples = int(max_samples)
-        self.loss_weight = float(loss_weight)
+        self.max_samples = max_samples
         self.freeze_extractor = freeze_extractor
-        # create optimizer; policy.predictor_head should exist
-        self.optimizer = torch.optim.Adam(self.model.policy.predictor_head.parameters(), lr=lr)
-        print(f"LSTMPredictorCallback initialized: H={H}, state_dim={state_dim}, max_samples={max_samples}")
-
-    def _on_rollout_end(self) -> None:
-        rb = self.model.rollout_buffer
-        # need n_envs and n_steps
-        try:
-            n_envs = self.training_env.num_envs if hasattr(self.training_env, "num_envs") else int(self.model.n_envs)
-            # SB3 rollouts length
-            # compute n_steps = total_samples / n_envs
-            N = rb.observations.shape[0]
-            n_steps = N // n_envs
-        except Exception as e:
-            print(f"LSTMPredictorCallback: cannot infer n_envs/n_steps; skipping predictor update: {e}")
-            return
-
-        # build future stack and attach
-        try:
-            attach_future_targets_to_rollout_buffer(rb, n_envs, n_steps, self.H)
-        except Exception as e:
-            print(f"LSTMPredictorCallback: failed to attach future targets: {e}")
-            return
-
-        future = rb.future_states  # numpy [N, H, D]
-        if future is None or len(future) == 0:
-            return
-
-        # Check memory usage
-        memory_gb = future.nbytes / (1024**3)
-        if memory_gb > 1.0:
-            print(f"Warning: future_states using {memory_gb:.2f}GB memory")
-
-        # sample subset
-        idxs = np.random.choice(len(future), size=min(self.max_samples, len(future)), replace=False)
-        fut_sample = torch.as_tensor(future[idxs], device=self.model.device, dtype=torch.float32)  # [B, H, D]
-
-        # Build corresponding obs batch that matches the feature extractor input
-        obs_flat = _flatten_obs_batch_for_predictor(rb.observations)  # [N, D]
-        obs_sample_flat = torch.as_tensor(obs_flat[idxs], device=self.model.device, dtype=torch.float32)  # [B, D]
-
-        # Convert obs_sample to the form expected by policy.extract_features.
-        # For LSTM, we need to convert flat tensor back to dict format
-        try:
-            # Get observation space to reconstruct dict
-            obs_space = self.training_env.observation_space
-            if isinstance(obs_space, gym.spaces.Dict):
-                # Reconstruct dict observations from flat tensor
-                obs_dict = {}
-                start_idx = 0
-                keys = sorted(obs_space.spaces.keys())
-                for key in keys:
-                    space = obs_space.spaces[key]
-                    if isinstance(space, gym.spaces.Box):
-                        size = int(np.prod(space.shape))
-                        obs_dict[key] = obs_sample_flat[:, start_idx:start_idx+size].view(-1, *space.shape)
-                        start_idx += size
-                obs_sample = obs_dict
-            else:
-                # Simple Box space
-                obs_sample = obs_sample_flat
-                
-            # Normalize future targets if VecNormalize is present
-            if isinstance(self.training_env, VecNormalize):
-                obs_rms = self.training_env.obs_rms
-                if obs_rms is not None:
-                    # Apply same normalization as used by the feature extractor
-                    fut_sample = (fut_sample - obs_rms.mean) / (np.sqrt(obs_rms.var) + 1e-8)
-
-            with torch.no_grad() if self.freeze_extractor else nullcontext():
-                features = self.model.policy.extract_features(obs_sample)
-        except Exception as e:
-            print(f"LSTMPredictorCallback: policy.extract_features failed: {e}")
-            return
-
-        # predictor forward + loss
-        preds = self.model.policy.predict_future(features)  # [B, H, D]
-        loss = F.mse_loss(preds, fut_sample) * self.loss_weight
-        self.optimizer.zero_grad()
-        loss.backward()
-        # clip grads if desired
-        torch.nn.utils.clip_grad_norm_(self.model.policy.predictor_head.parameters(), 1.0)
-        self.optimizer.step()
-        # Log loss
-        if hasattr(self, 'logger') and self.logger:
-            self.logger.record("predictor/loss", loss.item())
-        print(f"LSTM predictor loss: {loss.item():.6f}")
+        
+        # Create separate optimizer for predictor head only
+        if hasattr(policy, 'predictor_head') and policy.predictor_head is not None:
+            self.predictor_optimizer = torch.optim.Adam(
+                policy.predictor_head.parameters(), 
+                lr=predictor_lr
+            )
+        else:
+            self.predictor_optimizer = None
+            
+        self.predictor_loss_history = []
+    
+    def _on_step(self) -> bool:
+        """Required abstract method - called at each step"""
+        return True  # Continue training
 
 
 def load_config(path: str | Path) -> Dict[str, Any]:
