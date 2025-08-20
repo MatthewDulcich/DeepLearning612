@@ -463,16 +463,26 @@ def main() -> None:
     n_envs = cfg.get("n_envs", 8)
     max_episode_steps = cfg.get("max_episode_steps", 1000)
 
-    # Curriculum scheduler for step frequency - more gradual progression
-    step_frequencies = [10, 20, 50, 100]
-    
-    # Progressive success thresholds - start easier and get harder
-    success_thresholds = {
-        10: 0.2,   # Start with just 20% success at 10Hz
-        20: 0.4,   # Increase to 40% at 20Hz  
-        50: 0.6,   # Then 60% at 50Hz
-        100: 0.8   # Finally 80% at 100Hz
-    }
+    # Check if single frequency mode is enabled via config
+    if cfg.get("frequency") is not None:
+        # SINGLE FREQUENCY MODE - bypass curriculum
+        single_freq = cfg.get("frequency", 50)
+        print(f"🚀 SINGLE FREQUENCY MODE: Training at {single_freq}Hz (no curriculum)")
+        step_frequencies = [single_freq]
+        success_thresholds = {single_freq: 0.0}  # No progression needed
+    else:
+        # CURRICULUM MODE - multiple frequencies with progression
+        print("🎯 CURRICULUM LEARNING MODE: Progressive frequency training")
+        # Curriculum scheduler for step frequency - more gradual progression
+        step_frequencies = [10, 20, 50, 100]
+        
+        # Progressive success thresholds - start easier and get harder
+        success_thresholds = {
+            10: 0.2,   # Start with just 20% success at 10Hz
+            20: 0.4,   # Increase to 40% at 20Hz  
+            50: 0.6,   # Then 60% at 50Hz
+            100: 0.8   # Finally 80% at 100Hz
+        }
     
     curriculum_log = []
 
@@ -683,12 +693,19 @@ def main() -> None:
         if args.wandb and WANDB_AVAILABLE:
             callbacks.append(WandbCallback())
 
-        # train - divide total timesteps across curriculum stages
+        # train - handle timesteps based on mode
         total_timesteps = cfg.get("timesteps", 1_000_000)
-        timesteps_per_stage = total_timesteps // len(step_frequencies)
-        timesteps = timesteps_per_stage
         
-        print(f"[Curriculum] Training {timesteps:,} steps at {freq}Hz (stage {step_frequencies.index(freq)+1}/{len(step_frequencies)})")
+        if len(step_frequencies) == 1:
+            # Single frequency mode - use all timesteps
+            timesteps = total_timesteps
+            print(f"[Single Mode] Training {timesteps:,} steps at {freq}Hz")
+        else:
+            # Curriculum mode - divide timesteps across stages
+            timesteps_per_stage = total_timesteps // len(step_frequencies)
+            timesteps = timesteps_per_stage
+            print(f"[Curriculum] Training {timesteps:,} steps at {freq}Hz (stage {step_frequencies.index(freq)+1}/{len(step_frequencies)})")
+            
         model.learn(total_timesteps=timesteps, callback=callbacks)
 
         # Evaluate success rate (VecEnv safe)
@@ -738,6 +755,11 @@ def main() -> None:
         if args.wandb and WANDB_AVAILABLE:
             wandb.finish()
 
+        # Skip curriculum progression checks for single frequency mode
+        if len(step_frequencies) == 1:
+            print(f"[Single Mode] Training completed with {success_rate:.1%} success rate")
+            break
+
         # Check if we meet the threshold (be more forgiving for early stages)
         # Allow very low success rates for 10Hz as it's the hardest stage  
         min_acceptable_rate = 0.05 if freq == 10 else success_threshold * 0.75 if freq == 20 else success_threshold
@@ -761,7 +783,11 @@ def main() -> None:
             else:
                 print(f"🎉 [Curriculum] FINAL STAGE COMPLETED! Training successful at {freq}Hz")
 
-    print(f"[Curriculum] Training completed. Log: {curriculum_log}")
+    # Final summary
+    if len(step_frequencies) == 1:
+        print(f"[Single Mode] Training completed successfully")
+    else:
+        print(f"[Curriculum] Training completed. Log: {curriculum_log}")
 
 
 if __name__ == "__main__":
