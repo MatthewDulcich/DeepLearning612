@@ -1,8 +1,30 @@
 # LSTM Future Predictor Implementation
 
-## Overview
+## Ov## Usage
 
-This implementation adds a non-autoregressive 200-step future predictor to the LSTM policy as an auxiliary task alongside PPO training. The predictor learns to predict the next H future states from the current LSTM features, providing benefits for representation learning and potential model-based planning.
+### Quick Testing (5-step prediction)
+```bash
+# Test the implementation with a small horizon
+PYTHONPATH=src python -m src.drone_rl.train.train --config configs/lstm_predictor_test.yaml
+```
+
+### Medium-Scale Training (50-step prediction)  
+```bash
+# Medium-scale training for development
+PYTHONPATH=src python -m src.drone_rl.train.train --config configs/lstm_predictor_medium.yaml
+```
+
+### Full-Scale Training (200-step prediction)
+```bash
+# Full production training with 200-step prediction
+PYTHONPATH=src python -m src.drone_rl.train.train --config configs/lstm_predictor_full.yaml
+```
+
+### Baseline Comparison
+```bash
+# Train LSTM without predictor for comparison
+PYTHONPATH=src python -m src.drone_rl.train.train --config configs/baseline_lstm.yaml
+```implementation adds a non-autoregressive 200-step future predictor to the LSTM policy as an auxiliary task alongside PPO training. The predictor learns to predict the next H future states from the current LSTM features, providing benefits for representation learning and potential model-based planning.
 
 ## Implementation Details
 
@@ -34,14 +56,36 @@ The predictor is trained using a separate optimizer and callback:
 - `attach_future_targets_to_rollout_buffer(rb, n_envs, n_steps, H)`: Creates stacked future targets
 - `LSTMPredictorCallback`: Callback that trains predictor at rollout end
 
-## Configuration
+## Training Configuration Scaling
 
-Enable the predictor by setting these config values:
+The system automatically adjusts predictor training parameters based on horizon:
 
-```yaml
-predict_sequence: true
-prediction_horizon: 200  # or start with 10 for testing
-```
+- **H ≤ 10**: max_samples=1024, lr=1e-4 (more samples, standard learning rate)
+- **H ≤ 50**: max_samples=512, lr=1e-4 (moderate samples, standard learning rate)  
+- **H > 50**: max_samples=256, lr=5e-5 (fewer samples, lower learning rate for stability)
+
+### Memory Considerations
+
+- **H=5**: ~0.5GB predictor memory
+- **H=50**: ~2.5GB predictor memory
+- **H=200**: ~5GB predictor memory
+
+Monitor memory usage and reduce `n_envs` or `max_samples` if needed.
+
+### Training Progression
+
+1. **Start with H=5** to validate implementation
+2. **Scale to H=50** to test medium-term prediction  
+3. **Full H=200** for production training
+4. **Compare against baseline** LSTM without predictor
+
+## Expected Training Times
+
+- **Test (H=5, 250k steps)**: ~1-2 hours
+- **Medium (H=50, 1M steps)**: ~6-8 hours  
+- **Full (H=200, 2M steps)**: ~12-16 hours
+
+Times depend on hardware and environment complexity.
 
 ## Usage Examples
 

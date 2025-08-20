@@ -644,18 +644,29 @@ def main() -> None:
                 else:
                     state_dim = int(np.prod(obs_space.shape))
                 
-                # Create predictor callback with conservative settings
+                # Create predictor callback with settings based on horizon
+                # Scale max_samples inversely with horizon to manage memory
+                if H <= 10:
+                    max_samples = 1024    # Small horizon: more samples
+                    lr = 1e-4
+                elif H <= 50:
+                    max_samples = 512     # Medium horizon: moderate samples  
+                    lr = 1e-4
+                else:  # H > 50
+                    max_samples = 256     # Large horizon: fewer samples
+                    lr = 5e-5             # Lower learning rate for stability
+                
                 pred_callback = LSTMPredictorCallback(
                     model=model,
                     H=H,
                     state_dim=state_dim,
-                    max_samples=512,  # Limit memory usage
-                    lr=1e-4,  # Conservative learning rate
+                    max_samples=max_samples,
+                    lr=lr,
                     loss_weight=1.0,  # Can be reduced if it destabilizes PPO
                     freeze_extractor=True  # Safer: only train predictor head
                 )
                 callbacks.append(pred_callback)
-                print(f"✅ Added LSTM predictor callback with H={H}")
+                print(f"✅ Added LSTM predictor callback with H={H}, max_samples={max_samples}, lr={lr}")
         
         if args.wandb and WANDB_AVAILABLE:
             callbacks.append(WandbCallback())

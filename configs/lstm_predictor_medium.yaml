@@ -1,0 +1,41 @@
+# Medium-scale LSTM with 50-step future predictor  
+env_id: FlyCraft-v0
+run_name: lstm_predictor_50step
+output_dir: runs
+seed: 42
+
+# Medium scale for development
+n_envs: 6
+max_episode_steps: 750
+
+# LSTM policy 
+policy: lstm
+policy_kwargs:
+  lstm_hidden: 192    # Between test and full scale
+  lstm_layers: 2
+  dropout: 0.1
+
+# PPO settings
+ppo_kwargs:
+  n_steps: 768        # 6 envs * 768 = 4608 samples per iteration
+  batch_size: 384
+  n_epochs: 4
+  learning_rate: 3.0e-4
+  gamma: 0.995        
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+# Medium training duration  
+timesteps: 1_000_000
+
+# Regular checkpoints
+save_freq: 50_000
+eval_freq: 25_000
+n_eval_episodes: 8
+
+# 50-step prediction horizon (good middle ground)
+predict_sequence: true
+prediction_horizon: 50
