@@ -164,6 +164,63 @@ class LSTMPredictorCallback(BaseCallback):
     def _on_step(self) -> bool:
         """Required abstract method - called at each step"""
         return True  # Continue training
+    
+    def _on_rollout_end(self) -> None:
+        """Train predictor on collected rollout data"""
+        if self.predictor_optimizer is None:
+            if self.verbose > 0:
+                print("⚠️ No predictor optimizer - skipping predictor training")
+            return
+            
+        try:
+            # Get rollout buffer from PPO
+            rollout_buffer = self.model.rollout_buffer
+            
+            if not hasattr(rollout_buffer, 'future_states_targets'):
+                if self.verbose > 0:
+                    print("⚠️ No future state targets in buffer - skipping predictor training")
+                return
+            
+            # Extract data with limited sampling to prevent memory issues
+            obs_batch = _flatten_obs_batch_for_predictor(rollout_buffer.observations)
+            targets = rollout_buffer.future_states_targets
+            
+            # Limit sample size for memory efficiency
+            n_samples = min(len(obs_batch), self.max_samples)
+            if n_samples < len(obs_batch):
+                indices = torch.randperm(len(obs_batch))[:n_samples]
+                obs_batch = obs_batch[indices]
+                targets = targets[indices] 
+            
+            # Get policy features
+            if self.freeze_extractor:
+                with torch.no_grad():
+                    features = self.policy.extract_features(obs_batch)
+            else:
+                features = self.policy.extract_features(obs_batch)
+            
+            # Predict future states
+            predictions = self.policy.predict_future(features)
+            
+            # Compute MSE loss
+            loss = torch.nn.functional.mse_loss(predictions, targets)
+            
+            # Backprop for predictor only
+            self.predictor_optimizer.zero_grad()
+            loss.backward()
+            self.predictor_optimizer.step()
+            
+            # Log metrics
+            self.predictor_loss_history.append(loss.item())
+            
+            if self.verbose > 0:
+                print(f"🔮 Predictor loss: {loss.item():.6f} (samples: {n_samples})")
+                
+        except Exception as e:
+            if self.verbose > 0:
+                print(f"⚠️ Predictor training failed: {e}")
+                import traceback
+                traceback.print_exc()
 
 
 def load_config(path: str | Path) -> Dict[str, Any]:
