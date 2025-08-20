@@ -13,6 +13,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import yaml
+from contextlib import nullcontext
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback, EvalCallback
 from stable_baselines3.common.logger import configure
@@ -70,6 +71,178 @@ def load_config(path: str | Path) -> Dict[str, Any]:
     with open(path, "r", encoding="utf-8") as f:
         if path.suffix in (".yaml", ".yml"):
             return yaml.safe_load(f)
+        return json.load(f)
+
+
+def _flatten_obs_batch_for_predictor(obs_batch):
+    """
+    Robust flatten for rollout_buffer.observations.
+    - Accepts numpy array [N, D] (already flat) -> returns as-is
+    - Accepts object-dtype array of dicts -> concatenates sorted keys, ravel each field
+    Adapt this to exactly mirror the LSTMFeatureExtractor flatten order (use sorted keys).
+    """
+    # already flat
+    if isinstance(obs_batch, np.ndarray) and obs_batch.ndim == 2 and obs_batch.dtype != np.object_:
+        return obs_batch  # [N, D]
+
+    # object/structured array: each entry is a dict or array
+    # try to handle list-like
+    if isinstance(obs_batch, np.ndarray) and obs_batch.dtype == np.object_:
+        entries = list(obs_batch)
+    elif isinstance(obs_batch, (list, tuple)):
+        entries = list(obs_batch)
+    else:
+        raise RuntimeError("Unsupported rb.observations format for predictor flattening")
+
+    # If each entry is a dict, concat keys in sorted order
+    if len(entries) == 0:
+        return np.zeros((0, 0), dtype=np.float32)
+    first = entries[0]
+    if isinstance(first, dict):
+        keys = sorted(first.keys())
+        arrs = []
+        for k in keys:
+            arrs.append(np.stack([np.asarray(e[k]).ravel() for e in entries], axis=0))
+        return np.concatenate(arrs, axis=1)  # [N, D]
+    # fallback: each entry already an array
+    try:
+        return np.stack([np.asarray(e).ravel() for e in entries], axis=0)
+    except Exception as e:
+        raise RuntimeError("Failed to flatten rb.observations") from e
+
+
+def attach_future_targets_to_rollout_buffer(rollout_buffer, n_envs: int, n_steps: int, H: int):
+    """
+    Attach rollout_buffer.future_states shaped [N, H, D] where N = n_envs * n_steps.
+    Must be called after rollout collection and before predictor training.
+    """
+    obs = rollout_buffer.observations  # numpy array or object array
+    obs_flat = _flatten_obs_batch_for_predictor(obs)  # [N, D]
+    N, D = obs_flat.shape
+    assert N == n_envs * n_steps, f"obs size {N} != n_envs*n_steps {n_envs*n_steps}"
+    obs_seq = obs_flat.reshape(n_envs, n_steps, D)  # [n_envs, n_steps, D]
+
+    # pad tail with last observation to allow H offset
+    pad = np.repeat(obs_seq[:, -1:, :], H, axis=1)  # [n_envs, H, D]
+    padded = np.concatenate([obs_seq, pad], axis=1)  # [n_envs, n_steps+H, D]
+
+    future_list = []
+    for t in range(n_steps):
+        future = padded[:, t+1 : t+1+H, :]  # [n_envs, H, D]
+        future_list.append(future)
+    # stack time axis -> [n_steps, n_envs, H, D] -> transpose -> [n_envs*n_steps, H, D]
+    future = np.stack(future_list, axis=0)
+    future = future.transpose(1, 0, 2, 3).reshape(-1, H, D)
+    rollout_buffer.future_states = future  # attach
+    return
+
+
+class LSTMPredictorCallback(BaseCallback):
+    """Callback to train predictor head at rollout end using collected future states."""
+    
+    def __init__(self, model, H, state_dim, max_samples=512, lr=1e-4, loss_weight=1.0, freeze_extractor=True):
+        super().__init__()
+        self.model = model
+        self.H = H
+        self.state_dim = state_dim
+        self.max_samples = int(max_samples)
+        self.loss_weight = float(loss_weight)
+        self.freeze_extractor = freeze_extractor
+        # create optimizer; policy.predictor_head should exist
+        self.optimizer = torch.optim.Adam(self.model.policy.predictor_head.parameters(), lr=lr)
+        print(f"LSTMPredictorCallback initialized: H={H}, state_dim={state_dim}, max_samples={max_samples}")
+
+    def _on_rollout_end(self) -> None:
+        rb = self.model.rollout_buffer
+        # need n_envs and n_steps
+        try:
+            n_envs = self.training_env.num_envs if hasattr(self.training_env, "num_envs") else int(self.model.n_envs)
+            # SB3 rollouts length
+            # compute n_steps = total_samples / n_envs
+            N = rb.observations.shape[0]
+            n_steps = N // n_envs
+        except Exception as e:
+            print(f"LSTMPredictorCallback: cannot infer n_envs/n_steps; skipping predictor update: {e}")
+            return
+
+        # build future stack and attach
+        try:
+            attach_future_targets_to_rollout_buffer(rb, n_envs, n_steps, self.H)
+        except Exception as e:
+            print(f"LSTMPredictorCallback: failed to attach future targets: {e}")
+            return
+
+        future = rb.future_states  # numpy [N, H, D]
+        if future is None or len(future) == 0:
+            return
+
+        # Check memory usage
+        memory_gb = future.nbytes / (1024**3)
+        if memory_gb > 1.0:
+            print(f"Warning: future_states using {memory_gb:.2f}GB memory")
+
+        # sample subset
+        idxs = np.random.choice(len(future), size=min(self.max_samples, len(future)), replace=False)
+        fut_sample = torch.as_tensor(future[idxs], device=self.model.device, dtype=torch.float32)  # [B, H, D]
+
+        # Build corresponding obs batch that matches the feature extractor input
+        obs_flat = _flatten_obs_batch_for_predictor(rb.observations)  # [N, D]
+        obs_sample_flat = torch.as_tensor(obs_flat[idxs], device=self.model.device, dtype=torch.float32)  # [B, D]
+
+        # Convert obs_sample to the form expected by policy.extract_features.
+        # For LSTM, we need to convert flat tensor back to dict format
+        try:
+            # Get observation space to reconstruct dict
+            obs_space = self.training_env.observation_space
+            if isinstance(obs_space, gym.spaces.Dict):
+                # Reconstruct dict observations from flat tensor
+                obs_dict = {}
+                start_idx = 0
+                keys = sorted(obs_space.spaces.keys())
+                for key in keys:
+                    space = obs_space.spaces[key]
+                    if isinstance(space, gym.spaces.Box):
+                        size = int(np.prod(space.shape))
+                        obs_dict[key] = obs_sample_flat[:, start_idx:start_idx+size].view(-1, *space.shape)
+                        start_idx += size
+                obs_sample = obs_dict
+            else:
+                # Simple Box space
+                obs_sample = obs_sample_flat
+                
+            # Normalize future targets if VecNormalize is present
+            if isinstance(self.training_env, VecNormalize):
+                obs_rms = self.training_env.obs_rms
+                if obs_rms is not None:
+                    # Apply same normalization as used by the feature extractor
+                    fut_sample = (fut_sample - obs_rms.mean) / (np.sqrt(obs_rms.var) + 1e-8)
+
+            with torch.no_grad() if self.freeze_extractor else nullcontext():
+                features = self.model.policy.extract_features(obs_sample)
+        except Exception as e:
+            print(f"LSTMPredictorCallback: policy.extract_features failed: {e}")
+            return
+
+        # predictor forward + loss
+        preds = self.model.policy.predict_future(features)  # [B, H, D]
+        loss = F.mse_loss(preds, fut_sample) * self.loss_weight
+        self.optimizer.zero_grad()
+        loss.backward()
+        # clip grads if desired
+        torch.nn.utils.clip_grad_norm_(self.model.policy.predictor_head.parameters(), 1.0)
+        self.optimizer.step()
+        # Log loss
+        if hasattr(self, 'logger') and self.logger:
+            self.logger.record("predictor/loss", loss.item())
+        print(f"LSTM predictor loss: {loss.item():.6f}")
+
+
+def load_config(path: str | Path) -> Dict[str, Any]:
+    path = Path(path)
+    with open(path, "r", encoding="utf-8") as f:
+        if path.suffix in (".yaml", ".yml"):
+            return yaml.safe_load(f)
+        return json.load(f)
         return json.load(f)
 
 
@@ -420,6 +593,30 @@ def main() -> None:
         # logger
         model.set_logger(configure(str(run_dir), ["stdout", "csv", "tensorboard"]))
 
+        # Set up future predictor if enabled
+        if cfg.get("predict_sequence", False) and cfg.get("prediction_horizon", 0) > 0 and policy_name == "lstm":
+            H = int(cfg["prediction_horizon"])
+            # Compute state_dim by flattening observation_space (mirror _flatten_obs_batch_for_predictor)
+            obs_space = train_env.observation_space if hasattr(train_env, "observation_space") else train_env.envs[0].observation_space
+            # Simple flatten: sum Box dims
+            state_dim = 0
+            if isinstance(obs_space, gym.spaces.Dict):
+                for sp in obs_space.spaces.values():
+                    if isinstance(sp, gym.spaces.Box):
+                        state_dim += int(np.prod(sp.shape))
+                    else:
+                        raise ValueError("Unsupported observation sub-space for predictor")
+            else:
+                state_dim = int(np.prod(obs_space.shape))
+
+            # Create predictor head if missing
+            if not getattr(model.policy, "predictor_head", None):
+                model.policy.create_predictor_head(H, state_dim, device=model.device)
+            
+            print(f"✅ Enabled LSTM future predictor: H={H}, state_dim={state_dim}")
+        else:
+            print("ℹ️  Future predictor disabled or not applicable")
+
         # callbacks
         save_freq = max(cfg.get("save_freq", 10000) // n_envs, 1)
         eval_freq = max(cfg.get("eval_freq", 20000) // n_envs, 1)
@@ -446,6 +643,32 @@ def main() -> None:
         # Add LSTM reset callback if using LSTM policy
         if policy_name == "lstm":
             callbacks.append(LSTMResetCallback(verbose=1))
+            
+            # Add predictor callback if future prediction is enabled
+            if cfg.get("predict_sequence", False) and cfg.get("prediction_horizon", 0) > 0:
+                H = int(cfg["prediction_horizon"])
+                obs_space = train_env.observation_space if hasattr(train_env, "observation_space") else train_env.envs[0].observation_space
+                state_dim = 0
+                if isinstance(obs_space, gym.spaces.Dict):
+                    for sp in obs_space.spaces.values():
+                        if isinstance(sp, gym.spaces.Box):
+                            state_dim += int(np.prod(sp.shape))
+                else:
+                    state_dim = int(np.prod(obs_space.shape))
+                
+                # Create predictor callback with conservative settings
+                pred_callback = LSTMPredictorCallback(
+                    model=model,
+                    H=H,
+                    state_dim=state_dim,
+                    max_samples=512,  # Limit memory usage
+                    lr=1e-4,  # Conservative learning rate
+                    loss_weight=1.0,  # Can be reduced if it destabilizes PPO
+                    freeze_extractor=True  # Safer: only train predictor head
+                )
+                callbacks.append(pred_callback)
+                print(f"✅ Added LSTM predictor callback with H={H}")
+        
         if args.wandb and WANDB_AVAILABLE:
             callbacks.append(WandbCallback())
 

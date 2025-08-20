@@ -1,0 +1,41 @@
+# Test config for LSTM with future predictor
+env_id: FlyCraft-v0
+run_name: lstm_predictor_test
+output_dir: runs
+seed: 42
+
+# Small scale for testing
+n_envs: 2
+max_episode_steps: 100
+
+# LSTM policy
+policy: lstm
+policy_kwargs:
+  lstm_hidden: 128
+  lstm_layers: 2
+  dropout: 0.1
+
+# PPO settings
+ppo_kwargs:
+  n_steps: 64  # Small for testing
+  batch_size: 64
+  n_epochs: 2
+  learning_rate: 1.0e-4
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+# Short training for testing
+timesteps: 1000
+
+# Testing settings
+save_freq: 500
+eval_freq: 500
+n_eval_episodes: 2
+
+# Enable future predictor with small horizon for testing
+predict_sequence: true
+prediction_horizon: 5  # Start small, then scale to 200

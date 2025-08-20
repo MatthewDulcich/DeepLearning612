@@ -434,6 +434,11 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
             self.action_dist.use_sde = False
         if hasattr(self.action_dist, "log_std_init"):
             self.action_dist.log_std_init = getattr(self, "log_std_init", 0.0)
+        
+        # Future predictor attributes (set by training code)
+        self.predict_horizon = None
+        self.state_dim = None
+        self.predictor_head = None
     
     @staticmethod
     def _weights_init(module: nn.Module) -> None:
@@ -567,4 +572,52 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         """Reset LSTM hidden state between episodes or for done envs."""
         if hasattr(self.features_extractor, "reset_hidden"):
             self.features_extractor.reset_hidden(n_envs=n_envs, done_mask=done_mask)
+    
+    def create_predictor_head(self, horizon: int, state_dim: int, device: Optional[torch.device] = None):
+        """Configure and create a non-autoregressive predictor head mapping pooled features -> H x state_dim.
+        
+        Parameters
+        ----------
+        horizon : int
+            Number of future steps to predict
+        state_dim : int
+            Dimensionality of flattened state
+        device : Optional[torch.device]
+            Device to place the predictor head on
+        """
+        device = device or next(self.parameters()).device
+        self.predict_horizon = int(horizon)
+        self.state_dim = int(state_dim)
+        
+        # Get features dimension from the extractor or policy
+        feat_dim = getattr(self.features_extractor, "features_dim", None) or getattr(self, "features_dim", None)
+        if feat_dim is None:
+            raise RuntimeError("Cannot find features_dim on policy/extractor")
+        
+        self.predictor_head = nn.Linear(int(feat_dim), int(self.predict_horizon * self.state_dim)).to(device)
+        print(f"Created predictor head: {feat_dim} -> {self.predict_horizon * self.state_dim} (H={self.predict_horizon}, D={self.state_dim})")
+
+    def predict_future(self, features: torch.Tensor) -> torch.Tensor:
+        """Predict non-autoregressive next-H states from pooled LSTM features.
+        
+        Parameters
+        ----------
+        features : torch.Tensor
+            Pooled features from LSTM extractor, shape [B, features_dim]
+            
+        Returns
+        -------
+        torch.Tensor
+            Predicted future states, shape [B, H, state_dim]
+        """
+        if self.predictor_head is None:
+            raise RuntimeError("predictor_head not configured on policy (call create_predictor_head first)")
+        if self.predict_horizon is None or self.state_dim is None:
+            raise RuntimeError("predict_horizon/state_dim not set on policy")
+        
+        out = self.predictor_head(features)  # [B, H*D]
+        B = out.shape[0]
+        H = int(self.predict_horizon)
+        D = int(self.state_dim)
+        return out.view(B, H, D)
 
