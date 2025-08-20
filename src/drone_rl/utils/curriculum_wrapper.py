@@ -52,6 +52,26 @@ class FlyCraftCurriculumWrapper(gym.Wrapper):
         # Frequency-based step duration (higher frequency = shorter real-time steps)
         self.step_duration = 1.0 / self.frequency
         
+        # Update observation space to include curriculum keys
+        if isinstance(self.env.observation_space, gym.spaces.Dict):
+            curriculum_spaces = {
+                "curriculum_frequency": gym.spaces.Box(low=0, high=1000, shape=(1,), dtype=np.float32),
+                "curriculum_step_duration": gym.spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32),
+            }
+            
+            # Add distance_to_goal if we're tracking goal distance
+            if self.goal_cfg and self.goal_cfg.get("type") in ["fixed_short", "fixed_medium", "fixed_long"]:
+                curriculum_spaces["distance_to_goal"] = gym.spaces.Box(low=0, high=10000, shape=(1,), dtype=np.float32)
+            
+            # Create new observation space with curriculum keys
+            self.observation_space = gym.spaces.Dict({
+                **self.env.observation_space.spaces,
+                **curriculum_spaces
+            })
+        else:
+            # If not Dict space, keep original
+            self.observation_space = self.env.observation_space
+        
         if self.verbose:
             print(f"🎯 Curriculum Wrapper initialized:")
             print(f"   Frequency: {frequency}Hz (step_duration: {self.step_duration:.3f}s)")
@@ -297,8 +317,10 @@ class FlyCraftCurriculumWrapper(gym.Wrapper):
             obs["curriculum_frequency"] = np.array([self.frequency], dtype=np.float32)
             obs["curriculum_step_duration"] = np.array([self.step_duration], dtype=np.float32)
             
-            if self.current_distance_to_goal is not None:
-                obs["distance_to_goal"] = np.array([self.current_distance_to_goal], dtype=np.float32)
+            # Always add distance_to_goal if it's in our observation space
+            if "distance_to_goal" in self.observation_space.spaces:
+                distance = self.current_distance_to_goal if self.current_distance_to_goal is not None else 0.0
+                obs["distance_to_goal"] = np.array([distance], dtype=np.float32)
         
         return obs
     
