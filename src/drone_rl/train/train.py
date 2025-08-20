@@ -140,21 +140,23 @@ def attach_future_targets_to_rollout_buffer(rollout_buffer, n_envs: int, n_steps
 class LSTMPredictorCallback(BaseCallback):
     """Callback to train LSTM future predictor as auxiliary task"""
     
-    def __init__(self, policy, horizon: int, state_dim: int, 
-                 predictor_lr: float = 1e-4, max_samples: int = 512,
-                 freeze_extractor: bool = True, verbose: int = 0):
+    def __init__(self, model, H: int, state_dim: int, 
+                 lr: float = 1e-4, max_samples: int = 512,
+                 loss_weight: float = 1.0, freeze_extractor: bool = True, verbose: int = 0):
         super().__init__(verbose)
-        self.policy = policy
-        self.horizon = horizon
+        self.model = model
+        self.policy = model.policy  # Extract policy from model
+        self.horizon = H
         self.state_dim = state_dim
         self.max_samples = max_samples
+        self.loss_weight = loss_weight
         self.freeze_extractor = freeze_extractor
         
         # Create separate optimizer for predictor head only
-        if hasattr(policy, 'predictor_head') and policy.predictor_head is not None:
+        if hasattr(self.policy, 'predictor_head') and self.policy.predictor_head is not None:
             self.predictor_optimizer = torch.optim.Adam(
-                policy.predictor_head.parameters(), 
-                lr=predictor_lr
+                self.policy.predictor_head.parameters(), 
+                lr=lr
             )
         else:
             self.predictor_optimizer = None
