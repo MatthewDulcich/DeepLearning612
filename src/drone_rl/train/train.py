@@ -574,11 +574,11 @@ def main() -> None:
         policy_kwargs["features_extractor_kwargs"] = fx_kwargs
 
         # Only merge transformer_kwargs for transformer/performer
-        merged_policy_kwargs = policy_kwargs
+        merged_policy_kwargs = policy_kwargs.copy()
         if policy_name in ["transformer", "performer"]:
             transformer_kwargs = cfg.get("transformer_kwargs", {})
             transformer_kwargs.setdefault("attn_backend", "torch")
-            merged_policy_kwargs = {**policy_kwargs, **transformer_kwargs}
+            merged_policy_kwargs["transformer_kwargs"] = transformer_kwargs
 
         ppo_kwargs = cfg.get("ppo_kwargs", {})
         ppo_kwargs.setdefault("verbose", 1)
