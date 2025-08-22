@@ -1,52 +1,63 @@
 # ─────────────────────────────────────────
-#   Large Transformer “teacher” – tuned
+#   Large Transformer "teacher" – optimized for our implementation
 # ─────────────────────────────────────────
 env_id: FlyCraft-v0
-run_name: teacher_large_v5
+run_name: teacher_large_optimized
 output_dir: runs
 seed: 42
 
 # ───────── Parallel rollout settings ─────────
-n_envs: 16
+n_envs: 16                             # Good parallelization for data collection
 max_episode_steps: 1000
 
 # ───────── Transformer policy ─────────
 policy: transformer
 policy_kwargs:
-  log_std_init: -1.5                   # lower initial exploration for continuous actions
+  log_std_init: -1.0                   # Conservative initial exploration
   transformer_kwargs:
-    embed_dim: 512
-    depth: 8
-    num_heads: 16
-    dropout: 0.1
-    memory_size: 128
-    proj_out_dim: 256                  # must match your features_extractor projector
+    embed_dim: 512                     # Large embedding dimension for rich representations
+    depth: 8                           # Deep architecture for hierarchical learning
+    num_heads: 16                      # Rich attention patterns
+    seq_len: 20                        # Temporal window size
+    dropout: 0.1                       # Regularization
+    use_rotary: true                   # RoPE for relative attention
+    use_memory: true                   # Transformer-XL style memory
+    memory_size: 128                   # Long memory for trajectory planning
+    proj_out_dim: 256                  # Output projection dimension
+    prediction_horizon: 200            # Long-term prediction capability
 
 # ───────── PPO hyper-parameters ─────────
 ppo_kwargs:
-
-  n_steps: 2048                        # 16 * 2048 = 32768 samples / iter
-  batch_size: 4096
-  n_epochs: 4
-  learning_rate: 1.0e-4                # more stable than 3e-4 for this big net
-  gamma: 0.997
-  gae_lambda: 0.95
-  clip_range: 0.2                      # let PPO clip do the work
-  clip_range_vf: 0.2
-  ent_coef: 0.01
-  vf_coef: 0.5
-  max_grad_norm: 0.5
-  target_kl: null                      # or set to null to disable early stop
+  n_steps: 2048                        # 16 * 2048 = 32,768 samples per iteration
+  batch_size: 4096                     # Large batch for stable gradients
+  n_epochs: 4                          # Multiple passes over data
+  learning_rate: 1.0e-4                # Conservative LR for large model stability
+  gamma: 0.997                         # High discount for long-horizon tasks
+  gae_lambda: 0.95                     # GAE parameter for advantage estimation
+  clip_range: 0.2                      # Standard PPO clipping
+  clip_range_vf: 0.2                   # Value function clipping
+  ent_coef: 0.01                       # Entropy regularization
+  vf_coef: 0.5                         # Value function loss weight
+  max_grad_norm: 0.5                   # Gradient clipping for stability
+  target_kl: null                      # Disable early stopping for full training
 
 # ───────── Training length ─────────
-timesteps: 5_000_000
+timesteps: 5_000_000                   # 5M steps for full convergence
 
 # ───────── Logging / checkpoints ─────────
-save_freq: 50_000
-eval_freq: 20_000
-n_eval_episodes: 10
+save_freq: 50_000                      # Save every 50k steps
+eval_freq: 20_000                      # Evaluate every 20k steps
+n_eval_episodes: 10                    # Episodes per evaluation
 
-# ───────── Optional features ─────────
-use_spatio_temporal: true
-predict_sequence: true
-prediction_horizon: 200
+# ───────── Auxiliary prediction task ─────────
+predict_sequence: true                 # Enable auxiliary sequence prediction
+prediction_horizon: 200                # Predict 200 steps into future
+aux_coef: 1.0                          # Weight for auxiliary MSE loss
+
+# ───────── Data collection ─────────
+decoder_hidden_dim: 256                # GRU hidden dimension for predictor
+decoder_layers: 1                      # Single GRU layer for efficiency
+
+# ───────── Environment-specific ─────────
+# FlyCraft state dimension is typically 6 (position + velocity)
+# This will be auto-detected by the training script
