@@ -545,3 +545,16 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         """Reset LSTM hidden state between episodes."""
         if hasattr(self.features_extractor, "reset_hidden"):
             self.features_extractor.reset_hidden()
+
+    def get_action_logits(self, obs: Dict[str, torch.Tensor]) -> torch.Tensor:
+        """Return raw action logits for discrete actions or action means for continuous.
+
+        Provides a consistent interface for knowledge distillation.
+        """
+        features = self.extract_features(obs)
+        if isinstance(self.action_space, spaces.Discrete):
+            logits = self.action_net(features)
+            return logits
+        else:
+            mean_actions = self.action_mean(features)
+            return mean_actions

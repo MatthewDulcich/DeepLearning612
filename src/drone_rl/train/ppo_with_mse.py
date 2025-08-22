@@ -13,6 +13,7 @@ from stable_baselines3.common.policies import ActorCriticCnnPolicy, ActorCriticP
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
 from stable_baselines3.common.utils import explained_variance
 from stable_baselines3.ppo import PPO
+from drone_rl.models.transformer_policy import TransformerActorCritic
 
 class PPOWithMSE(PPO):
     """
@@ -113,26 +114,110 @@ class PPOWithMSE(PPO):
 
                 # Checks to see if MSE loss should be added (This is added and not from the SB3 repo)
                 if hasattr(self.policy, 'state_predictor') and hasattr(self.policy, 'get_seq_prediction_targets'):
-                    # Get a batch of data for auxiliary prediction
-                    batch = self.policy.get_seq_prediction_targets()
+                    # Get a batch of data for auxiliary prediction. The helper should
+                    # return (embedding, target_sequence) where embedding is the
+                    # encoder embedding [B, embed_dim] and target_sequence is
+                    # [B, H, state_dim]. This keeps the predictor API consistent.
+                    batch = self.policy.get_seq_prediction_targets(batch_size=self.batch_size)
                     if batch is not None:
-                        embedding, initial_state, target_sequence = batch
+                        try:
+                            embedding, target_sequence = batch
+                            # Predict future states using the state_predictor
+                            # StateSequencePredictor.forward expects (encoder_embedding, teacher_forcing=False, teacher_seq=None)
+                            pred_sequence = self.policy.state_predictor(embedding)
 
-                        # Predict future states using the state_predictor
-                        pred_sequence = self.policy.state_predictor(embedding, initial_state)
+                            # Compute MSE loss between predicted and true future states
+                            mse_loss = F.mse_loss(pred_sequence, target_sequence)
 
-                        # Compute MSE loss between predicted and true future states
-                        mse_loss = F.mse_loss(pred_sequence, target_sequence)
+                            # Weighted auxiliary loss
+                            aux_term = float(self.aux_coef) * mse_loss
 
-                        # Add the auxiliary loss to the PPO loss (this is a post-update, so you may want to log or optimize separately)
-                        # For demonstration, we'll just log it
-                        if hasattr(self, 'logger'):
-                            self.logger.record("train/mse_loss", mse_loss.item())
+                            # Log both raw and weighted losses
+                            if hasattr(self, 'logger'):
+                                try:
+                                    self.logger.record("train/mse_loss", float(mse_loss.item()))
+                                    self.logger.record("train/mse_loss_weighted", float(aux_term.item()))
+                                except Exception:
+                                    # In some contexts logger.record may raise for non-scalar types
+                                    pass
 
-                        # Add the auxiliary loss to the PPO loss
-                        loss += mse_loss
+                            # Add the auxiliary loss to the PPO loss
+                            loss = loss + aux_term
+                        except Exception:
+                            # If anything in the aux loss computation fails, skip it
+                            if hasattr(self, 'logger'):
+                                try:
+                                    self.logger.record("train/mse_error", 1)
+                                except Exception:
+                                    pass
 
                 # Optimization step
+                # If knowledge distillation is configured on the outer model, compute KD loss
+                # Only run KD when both student and teacher are transformer policies to avoid
+                # accidentally distilling from/to baseline LSTM policies.
+                if (
+                    hasattr(self, "teacher")
+                    and hasattr(self, "kd_params")
+                    and self.teacher is not None
+                    and isinstance(self.policy, TransformerActorCritic)
+                    and isinstance(self.teacher.policy, TransformerActorCritic)
+                ):
+                    try:
+                        # Evaluate teacher values for the same observations/actions (no grad)
+                        with th.no_grad():
+                            t_values, _, _ = self.teacher.policy.evaluate_actions(rollout_data.observations, rollout_data.actions)
+
+                        # Try to obtain logits from teacher and student via get_action_logits
+                        s_logits = None
+                        t_logits = None
+                        try:
+                            if hasattr(self.policy, "get_action_logits"):
+                                s_logits = self.policy.get_action_logits(rollout_data.observations)
+                        except Exception:
+                            s_logits = None
+                        try:
+                            if hasattr(self.teacher.policy, "get_action_logits"):
+                                with th.no_grad():
+                                    t_logits = self.teacher.policy.get_action_logits(rollout_data.observations)
+                        except Exception:
+                            t_logits = None
+
+                        # Compute KL only if both logits available
+                        if (s_logits is not None) and (t_logits is not None):
+                            temperature = float(self.kd_params.get("temperature", 1.0))
+                            alpha = float(self.kd_params.get("alpha", 0.5))
+                            kl = F.kl_div(
+                                F.log_softmax(s_logits / temperature, dim=-1),
+                                F.softmax(t_logits / temperature, dim=-1).detach(),
+                                reduction="batchmean",
+                            )
+                        else:
+                            kl = th.tensor(0.0, device=loss.device)
+
+                        # Value MSE (student values are `values` computed earlier)
+                        value_mse = F.mse_loss(values, t_values.detach())
+                        kd_loss = alpha * kl + (1.0 - alpha) * value_mse
+                        kd_weight = float(self.kd_params.get("weight", 0.7))
+                        if hasattr(self, 'logger'):
+                            try:
+                                self.logger.record("train/kd_kl", float(kl.item()))
+                                self.logger.record("train/kd_value_mse", float(value_mse.item()))
+                                self.logger.record("train/kd_loss", float(kd_loss.item()))
+                            except Exception:
+                                pass
+
+                        loss = loss + kd_weight * kd_loss
+                    except Exception:
+                        # If KD fails, continue without it
+                        pass
+                else:
+                    # Not performing KD for non-transformer policies; optionally log skip.
+                    if hasattr(self, 'logger'):
+                        try:
+                            self.logger.record("train/kd_skipped", 1)
+                        except Exception:
+                            pass
+
                 self.policy.optimizer.zero_grad()
                 loss.backward()
                 # Clip grad norm

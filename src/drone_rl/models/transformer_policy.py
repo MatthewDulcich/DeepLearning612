@@ -347,6 +347,73 @@ class TransformerFeaturesExtractor(BaseFeaturesExtractor):
             self.transformer.reset_memory()
 
 
+class StateSequencePredictor(nn.Module):
+    """Autoregressive GRU decoder that generates a sequence of future states.
+
+    This is intentionally separate from the actor/critic path and is meant
+    to be used as an auxiliary head during training only.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        state_dim: int,
+        horizon: int = 200,
+        hidden_dim: int = 256,
+        num_layers: int = 1,
+    ) -> None:
+        super().__init__()
+        self.horizon = int(horizon)
+        self.state_dim = int(state_dim)
+        self.hidden_dim = int(hidden_dim)
+        self.num_layers = int(num_layers)
+
+        # Project encoder embedding to initial GRU hidden state
+        self.init_proj = nn.Linear(embed_dim, self.hidden_dim * self.num_layers)
+
+        # GRU decoder consumes previous predicted state (or start token)
+        self.gru = nn.GRU(
+            input_size=self.state_dim,
+            hidden_size=self.hidden_dim,
+            num_layers=self.num_layers,
+            batch_first=True,
+        )
+
+        # Output projection from GRU hidden -> predicted state
+        self.out_proj = nn.Linear(self.hidden_dim, self.state_dim)
+
+        # Learnable start token for the autoregressive decoder
+        self.register_parameter("start_token", nn.Parameter(torch.zeros(self.state_dim)))
+
+    def forward(self, encoder_embedding: torch.Tensor, teacher_forcing: bool = False, teacher_seq: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """
+        encoder_embedding: [B, embed_dim]
+        teacher_seq (optional): [B, H, state_dim] if teacher_forcing True
+
+        returns: preds [B, H, state_dim]
+        """
+        B = encoder_embedding.size(0)
+
+        # init hidden: [num_layers, B, hidden_dim]
+        hidden = self.init_proj(encoder_embedding).view(self.num_layers, B, self.hidden_dim)
+
+        prev = self.start_token.unsqueeze(0).expand(B, -1).to(encoder_embedding.device)
+
+        preds: List[torch.Tensor] = []
+        for t in range(self.horizon):
+            out, hidden = self.gru(prev.unsqueeze(1), hidden)
+            next_state = self.out_proj(out.squeeze(1))
+            preds.append(next_state)
+
+            if teacher_forcing and teacher_seq is not None:
+                prev = teacher_seq[:, t]
+            else:
+                # detach to avoid gradients flowing through predictions
+                prev = next_state.detach()
+
+        return torch.stack(preds, dim=1)
+
+
 # ---------------- Policy ---------------- #
 
 class TransformerActorCritic(ActorCriticPolicy):
@@ -422,6 +489,33 @@ class TransformerActorCritic(ActorCriticPolicy):
             log_prob = log_prob.sum(-1)
         return actions, values, log_prob
 
+    # ----- Predictor helper API (auxiliary head) -----
+    def create_predictor_head(self, horizon: int, state_dim: int, hidden_dim: int = 256, num_layers: int = 1) -> None:
+        """Attach a StateSequencePredictor auxiliary head to this policy.
+
+        This does not affect the forward/action selection path.
+        """
+        if hasattr(self, "predictor") and self.predictor is not None:
+            return
+        embed_dim = getattr(self.features_extractor, "_features_dim", None) or self.features_extractor.features_dim
+        self.predictor = StateSequencePredictor(embed_dim=embed_dim, state_dim=state_dim, horizon=horizon, hidden_dim=hidden_dim, num_layers=num_layers)
+        # place on same device as policy
+        try:
+            self.predictor.to(next(self.parameters()).device)
+        except StopIteration:
+            pass
+
+    def predict_future(self, obs: Dict[str, torch.Tensor], teacher_forcing: bool = False, teacher_seq: Optional[torch.Tensor] = None) -> Optional[torch.Tensor]:
+        """Run the predictor head (if present) to produce future state sequence.
+
+        Returns None if no predictor is attached.
+        """
+        if not hasattr(self, "predictor") or self.predictor is None:
+            return None
+        with torch.no_grad() if not teacher_forcing else torch.enable_grad():
+            features = self.extract_features(obs)
+            return self.predictor(features, teacher_forcing=teacher_forcing, teacher_seq=teacher_seq)
+
     def _predict(self, observation: Dict[str, torch.Tensor], deterministic: bool = False) -> torch.Tensor:
         actions, _, _ = self.forward(observation, deterministic)
         return actions
@@ -450,3 +544,18 @@ class TransformerActorCritic(ActorCriticPolicy):
     def reset_memory(self) -> None:
         if hasattr(self.features_extractor, "reset_memory"):
             self.features_extractor.reset_memory()
+
+    def get_action_logits(self, obs: Dict[str, torch.Tensor]) -> torch.Tensor:
+        """Return raw action logits for discrete actions or action means for continuous.
+
+        This provides a consistent interface for KD. Expects `obs` as the same
+        format accepted by `forward`/`evaluate_actions` (dict of tensors).
+        """
+        features = self.extract_features(obs)
+        if isinstance(self.action_space, spaces.Discrete):
+            logits = self.action_net(features)
+            return logits
+        else:
+            # For continuous actions we return the mean as a proxy for logits.
+            mean_actions = self.action_mean(features)
+            return mean_actions

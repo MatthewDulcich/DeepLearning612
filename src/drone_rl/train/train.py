@@ -368,6 +368,7 @@ def main() -> None:
         env=train_env,
         tensorboard_log=str(run_dir / "tb"),
         policy_kwargs=policy_kwargs,
+        aux_coef=cfg.get("aux_coef", 1.0),
         **ppo_kwargs,
     )
 
@@ -379,14 +380,30 @@ def main() -> None:
         else:
             state_dim = int(np.prod(obs_space.shape))
 
+        horizon = int(cfg.get("prediction_horizon", 200))
+        hidden_dim = int(cfg.get("decoder_hidden_dim", 256))
+        decoder_layers = int(cfg.get("decoder_layers", 2))
+
         embed_dim_for_seq = model.policy.features_extractor.features_dim
-        seq_predictor = StateSequencePredictor(
-            embed_dim=embed_dim_for_seq,
-            state_dim=state_dim,
-            horizon=cfg.get("prediction_horizon", 200),
-            hidden_dim=cfg.get("decoder_hidden_dim", 256),
-            num_layers=cfg.get("decoder_layers", 2),
-        ).to(model.policy.device)
+
+        # If policy supports create_predictor_head (e.g., TransformerActorCritic), use it.
+        if hasattr(model.policy, "create_predictor_head"):
+            try:
+                model.policy.create_predictor_head(horizon=horizon, state_dim=state_dim, hidden_dim=hidden_dim, num_layers=decoder_layers)
+                # predictor object available as model.policy.predictor per API
+                model.policy.state_predictor = getattr(model.policy, "predictor", None)
+            except Exception:
+                model.policy.state_predictor = None
+        else:
+            # Fallback: attach a standalone predictor module
+            seq_predictor = StateSequencePredictor(
+                embed_dim=embed_dim_for_seq,
+                state_dim=state_dim,
+                horizon=horizon,
+                hidden_dim=hidden_dim,
+                num_layers=decoder_layers,
+            ).to(model.policy.device)
+            model.policy.state_predictor = seq_predictor
 
         def _flatten_first_env_t(obs_t):
             if isinstance(obs_t, dict):
@@ -394,37 +411,116 @@ def main() -> None:
             return obs_t[0].reshape(-1)
 
         @torch.no_grad()
-        def predict_next_states(obs0, horizon=None):
-            if horizon is None:
-                horizon = cfg.get("prediction_horizon", 200)
+        def predict_next_states(obs0, horizon_local=None):
+            if horizon_local is None:
+                horizon_local = horizon
             obs_t, _ = model.policy.obs_to_tensor(obs0)
             emb = model.policy.extract_features(obs_t)
             init_state = _flatten_first_env_t(obs_t)
-            preds = seq_predictor(embedding=emb[0].unsqueeze(0), initial_state=init_state.unsqueeze(0))
-            return preds.cpu().numpy()[0][:horizon]
+            if getattr(model.policy, "state_predictor", None) is None:
+                return None
+            preds = model.policy.state_predictor(embedding=emb[0].unsqueeze(0), initial_state=init_state.unsqueeze(0))
+            return preds.cpu().numpy()[0][:horizon_local]
 
         def get_seq_prediction_targets(batch_size=40):
-            # This method should return (embedding, initial_state, target_sequence)
-            # Access the rollout buffer
+            """Return (embedding, target_sequence) sampled from the rollout buffer.
+
+            This function samples `batch_size` time indices from the available
+            rollout buffer entries and constructs target sequences of length
+            `horizon`. It returns None if the buffer doesn't contain enough
+            consecutive timesteps to build targets.
+            """
             buffer = model.rollout_buffer
-            # Get the number of available samples
-            n_samples = buffer.size()
-            if n_samples < batch_size:
-                batch_size = n_samples
+            try:
+                buf_size = int(buffer.buffer_size)
+                pos = int(getattr(buffer, "pos", 0))
+            except Exception:
+                return None
 
-            # Get the newest observations
-            obs_batch = buffer.get_recent_observations(batch_size)
-            # Split the batch in half
-            half = obs_batch.shape[1] // 2
-            init_state_batch = obs_batch[:, :half]
-            target_sequence = obs_batch[:, half:]
-            
-            # Get the embeddings of the init_state_batch
-            emb_batch = model.policy.extract_features(init_state_batch)
+            full_flag = getattr(buffer, "full", False)
+            available = buf_size if full_flag else pos
+            if available <= 0:
+                return None
 
-            return emb_batch, init_state_batch, target_sequence
+            if batch_size > available:
+                batch_size = available
 
-        model.policy.state_predictor = seq_predictor
+            obs_storage = getattr(buffer, "observations", None)
+            if obs_storage is None:
+                return None
+
+            # Convert storage to numpy arrays for indexing
+            try:
+                if isinstance(obs_storage, dict):
+                    arrs = {k: np.asarray(v) for k, v in obs_storage.items()}
+                    total_feat = sum(a.shape[-1] if a.ndim == 2 else int(np.prod(a.shape[2:])) for a in arrs.values())
+                else:
+                    arrs = {"__obs": np.asarray(obs_storage)}
+                    total_feat = arrs["__obs"].shape[-1]
+            except Exception:
+                return None
+
+            # Need contiguous horizon after index i; ensure indices chosen allow that
+            max_start = pos - horizon
+            if max_start <= 0:
+                return None
+
+            # Sample indices from [pos - available, max_start)
+            start_base = pos - available
+            indices = np.random.randint(start_base, max_start, size=batch_size)
+
+            # Build batches
+            inits = []
+            targets = []
+            for idx in indices:
+                # gather flattened observation at idx as init
+                if len(arrs) == 1 and "__obs" in arrs:
+                    obs_flat = arrs["__obs"][idx]
+                else:
+                    parts = []
+                    for k in sorted(arrs.keys()):
+                        a = arrs[k]
+                        parts.append(a[idx].reshape(-1))
+                    obs_flat = np.concatenate(parts, axis=0)
+
+                # collect future sequence from idx+1 .. idx+horizon
+                seq_parts = []
+                for t in range(1, horizon + 1):
+                    j = idx + t
+                    if j >= pos:
+                        # not enough future steps
+                        seq_parts = None
+                        break
+                    if len(arrs) == 1 and "__obs" in arrs:
+                        seq_parts.append(arrs["__obs"][j].reshape(-1))
+                    else:
+                        parts = [arrs[k][j].reshape(-1) for k in sorted(arrs.keys())]
+                        seq_parts.append(np.concatenate(parts, axis=0))
+                if seq_parts is None:
+                    continue
+                inits.append(obs_flat)
+                targets.append(np.stack(seq_parts, axis=0))
+
+            if len(inits) == 0:
+                return None
+
+            inits_np = np.stack(inits, axis=0)
+            targets_np = np.stack(targets, axis=0)  # [B, horizon, feat]
+
+            try:
+                init_t = torch.as_tensor(inits_np, device=model.policy.device, dtype=torch.float32)
+                # Extract embeddings from policy feature extractor
+                emb_batch = model.policy.extract_features({k: init_t for k in (model.policy.observation_space.spaces.keys() if hasattr(model.policy, 'observation_space') else ['obs'])})
+            except Exception:
+                # Fallback: try to reshape init_t to dict if extract_features expects dict
+                try:
+                    emb_batch = model.policy.extract_features(init_t)
+                except Exception:
+                    return None
+
+            target_t = torch.as_tensor(targets_np, device=model.policy.device, dtype=torch.float32)
+            return emb_batch, target_t
+
         model.policy.predict_next_states = predict_next_states  # type: ignore
         model.policy.get_seq_prediction_targets = get_seq_prediction_targets
 
@@ -433,24 +529,24 @@ def main() -> None:
 
     # KD
     if args.teacher:
-        print(f"Loading teacher model from {args.teacher} for knowledge distillation")
-        teacher = PPO.load(args.teacher, env=train_env, device=device)
-
-        def custom_distillation_loss(model_outputs):
-            pi_logits, values, old_logprobs, advantages, returns, entropy_coef, vf_coef = model_outputs
-            with torch.no_grad():
-                t_actions, t_values, t_log_probs = teacher.policy.evaluate_actions(model.policy._last_obs)
-            kd_loss = student_loss(
-                (pi_logits, values),
-                (t_log_probs, t_values),
-                temperature=cfg.get("distillation_temperature", 2.0),
-                alpha=cfg.get("distillation_alpha", 0.5),
+        teacher_path = Path(args.teacher)
+        print(f"Loading teacher model from {teacher_path} for knowledge distillation")
+        if not teacher_path.exists():
+            raise FileNotFoundError(f"Teacher model path not found: {teacher_path}")
+        teacher = PPO.load(str(teacher_path), env=train_env, device=device)
+        # Ensure teacher policy is a Transformer so we only perform transformer->transformer KD
+        if not isinstance(teacher.policy, TransformerActorCritic):
+            raise TypeError(
+                "Loaded teacher policy is not a TransformerActorCritic. "
+                "Knowledge distillation currently supports transformer->transformer only."
             )
-            kd_weight = cfg.get("distillation_weight", 0.5)
-            ppo_loss = model.policy.loss(pi_logits, values, old_logprobs, advantages, returns, entropy_coef, vf_coef)
-            return (1 - kd_weight) * ppo_loss + kd_weight * kd_loss
-
-        model.policy.custom_loss = custom_distillation_loss  # type: ignore
+        # Attach teacher and KD hyperparams to model for use inside PPOWithMSE.train
+        model.teacher = teacher
+        model.kd_params = {
+            "temperature": float(cfg.get("distillation_temperature", 2.0)),
+            "alpha": float(cfg.get("distillation_alpha", 0.5)),
+            "weight": float(cfg.get("distillation_weight", 0.7)),
+        }
 
     # callbacks
     save_freq = max(cfg.get("save_freq", 10000) // n_envs, 1)
