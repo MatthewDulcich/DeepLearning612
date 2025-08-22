@@ -874,10 +874,10 @@ def main():
         ckpt_path = checkpoint
         if model_type != "pid" and ckpt_path is not None:
             low = ckpt_path.lower()
-            if low.endswith(".zip.zip"):
+            if low.endswith(".zip"):
                 ckpt_path = ckpt_path[:-4]
             elif not low.endswith(".zip"):
-                ckpt_path = ckpt_path + ".zip"
+                ckpt_path = ckpt_path + ""
         with st.spinner(f"Loading {model_type.upper()} model..."):
             model, env = load_model(ckpt_path, model_type)
 
