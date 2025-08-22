@@ -999,9 +999,29 @@ def main():
                         "Reward": last_results["rewards"],
                     })
                     fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["TTC (s)"], mode="lines", name="TTC (s)"))
-                    fig.add_trace(go.Scatter(x=metrics_df["Step"], y=metrics_df["Reward"], mode="lines", name="Reward"))
-                    fig.update_layout(xaxis_title="Simulation Step", yaxis_title="Value", legend=dict(x=0, y=1, orientation="h"), margin=dict(l=0, r=0, b=0, t=30), height=400)
+                    fig.add_trace(
+                        go.Scatter(
+                            x=metrics_df["Step"],
+                            y=metrics_df["TTC (s)"],
+                            mode="lines",
+                            name="TTC (s)",
+                        )
+                    )
+                    fig.add_trace(
+                        go.Scatter(
+                            x=metrics_df["Step"],
+                            y=metrics_df["Reward"],
+                            mode="lines",
+                            name="Reward",
+                        )
+                    )
+                    fig.update_layout(
+                        xaxis_title="Simulation Step",
+                        yaxis_title="Value",
+                        legend=dict(x=0, y=1, orientation="h"),
+                        margin=dict(l=0, r=0, b=0, t=30),
+                        height=400,
+                    )
                     st.plotly_chart(fig, use_container_width=True, key="training_metrics")
 
                 # Add action analysis plots
