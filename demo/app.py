@@ -7,6 +7,19 @@ This interactive demo allows users to:
 4. Compare different models (transformer, LSTM, PID)
 5. Visualize attention patterns and state predictions
 """
+import os
+import sys
+from pathlib import Path
+
+# Ensure project root is on sys.path so `from src...` imports work when running via Streamlit.
+# Streamlit sometimes runs the script in a subprocess where PYTHONPATH isn't set; adding
+# the repo root here makes imports robust regardless of how Streamlit is invoked.
+repo_root = Path(__file__).resolve().parents[1]
+repo_root_str = str(repo_root)
+if repo_root_str not in sys.path:
+    sys.path.insert(0, repo_root_str)
+os.environ.setdefault('PYTHONPATH', repo_root_str)
+
 import argparse
 import time
 from pathlib import Path
