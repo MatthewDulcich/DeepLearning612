@@ -460,6 +460,19 @@ class TransformerActorCritic(ActorCriticPolicy):
 
         self.value_net = _build_mlp(latent_dim, 1, [256, 256, 128])
         self.apply(self._weights_init)
+        
+        # Initialize state predictor for auxiliary sequence prediction
+        # Extract embed_dim from features_extractor
+        embed_dim = features_kwargs.get("embed_dim", 256)
+        prediction_horizon = transformer_kwargs.get("prediction_horizon", 200)
+        
+        # Create predictor head with default state_dim (can be updated later)
+        self.create_predictor_head(
+            horizon=prediction_horizon, 
+            state_dim=6,  # Default: [x, y, z, vx, vy, vz] - adjust as needed
+            hidden_dim=256,
+            num_layers=1
+        )
 
     @staticmethod
     def _weights_init(module: nn.Module) -> None:
@@ -495,13 +508,13 @@ class TransformerActorCritic(ActorCriticPolicy):
 
         This does not affect the forward/action selection path.
         """
-        if hasattr(self, "predictor") and self.predictor is not None:
+        if hasattr(self, "state_predictor") and self.state_predictor is not None:
             return
         embed_dim = getattr(self.features_extractor, "_features_dim", None) or self.features_extractor.features_dim
-        self.predictor = StateSequencePredictor(embed_dim=embed_dim, state_dim=state_dim, horizon=horizon, hidden_dim=hidden_dim, num_layers=num_layers)
+        self.state_predictor = StateSequencePredictor(embed_dim=embed_dim, state_dim=state_dim, horizon=horizon, hidden_dim=hidden_dim, num_layers=num_layers)
         # place on same device as policy
         try:
-            self.predictor.to(next(self.parameters()).device)
+            self.state_predictor.to(next(self.parameters()).device)
         except StopIteration:
             pass
 
@@ -510,11 +523,11 @@ class TransformerActorCritic(ActorCriticPolicy):
 
         Returns None if no predictor is attached.
         """
-        if not hasattr(self, "predictor") or self.predictor is None:
+        if not hasattr(self, "state_predictor") or self.state_predictor is None:
             return None
         with torch.no_grad() if not teacher_forcing else torch.enable_grad():
             features = self.extract_features(obs)
-            return self.predictor(features, teacher_forcing=teacher_forcing, teacher_seq=teacher_seq)
+            return self.state_predictor(features, teacher_forcing=teacher_forcing, teacher_seq=teacher_seq)
 
     def _predict(self, observation: Dict[str, torch.Tensor], deterministic: bool = False) -> torch.Tensor:
         actions, _, _ = self.forward(observation, deterministic)
@@ -559,3 +572,22 @@ class TransformerActorCritic(ActorCriticPolicy):
             # For continuous actions we return the mean as a proxy for logits.
             mean_actions = self.action_mean(features)
             return mean_actions
+    
+    def get_seq_prediction_targets(self, batch_size: int = 32) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
+        """Generate training data for auxiliary sequence prediction task.
+        
+        This method should return (embedding, target_sequence) where:
+        - embedding: [batch_size, embed_dim] encoder embeddings
+        - target_sequence: [batch_size, horizon, state_dim] future state sequences
+        
+        Returns None if no training data is available.
+        """
+        # TODO: Implement based on your specific data collection strategy
+        # This could involve:
+        # 1. Sampling from replay buffer
+        # 2. Using environment rollouts
+        # 3. Loading from pre-collected dataset
+        
+        # For now, return None to skip auxiliary training
+        # Replace this with your actual implementation
+        return None
