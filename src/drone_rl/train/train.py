@@ -88,7 +88,14 @@ def make_env(
             import flycraft  # noqa: F401
         except ImportError:
             pass
-        env = gym.make(env_id, custom_config=env_config, max_episode_steps=max_episode_steps)
+
+        env = None
+        # Check if env_config is None
+        if env_config is None:
+            env = gym.make(env_id, max_episode_steps=max_episode_steps)
+        else:
+            env = gym.make(env_id, custom_config=env_config, max_episode_steps=max_episode_steps)
+
         env.reset(seed=seed + rank)
 
         if capture_video and rank == 0 and run_dir is not None:
@@ -281,7 +288,7 @@ class StateSequencePredictor(nn.Module):
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train drone navigation policy")
     parser.add_argument("--config", required=True)
-    parser.add_argument("--env_config", required=True)
+    parser.add_argument("--env_config", required=False, default=None)
     parser.add_argument("--teacher", type=str, default=None)
     parser.add_argument("--sweep", type=int, default=None)
     parser.add_argument("--seed", type=int, default=None)
@@ -290,8 +297,11 @@ def main() -> None:
     parser.add_argument("--device", type=str, default=None)
     args = parser.parse_args()
 
-    # Load environment config (json to dict)
-    env_cfg = load_config(args.env_config)
+    # Load environment config (json to dict) if provided
+    if args.env_config is not None:
+        env_cfg = load_config(args.env_config)
+    else:
+        env_cfg = None
 
     cfg = load_config(args.config)
     seed = args.seed if args.seed is not None else cfg.get("seed", 42)
