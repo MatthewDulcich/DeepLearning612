@@ -1,0 +1,34 @@
+# Distilled student Transformer configuration
+env_id: FlyCraft-Nav-v0
+run_name: student_distilled
+output_dir: runs
+seed: 7
+n_envs: 8
+
+policy: transformer
+policy_kwargs:
+  transformer_kwargs:
+    embed_dim: 256
+    depth: 4
+    num_heads: 8
+    dropout: 0.1
+    memory_size: 64
+
+ppo_kwargs:
+  learning_rate: 1.0e-4
+  n_steps: 1024
+  batch_size: 2048
+  n_epochs: 3
+  gamma: 0.995
+  gae_lambda: 0.95
+  clip_range: 0.2
+
+timesteps: 2000000
+save_freq: 20000
+eval_freq: 10000
+
+# Knowledge-distillation settings
+distillation_temperature: 2.0
+distillation_alpha: 0.5
+distillation_weight: 0.7
+teacher_model: runs/teacher_large/final_model.zip
