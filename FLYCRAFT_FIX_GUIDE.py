@@ -130,7 +130,7 @@ env.close()
 "
 
 # 2. Test basic training
-PYTHONPATH=src python -m src.drone_rl.train.train --config configs/baseline_simple_working.yaml
+PYTHONPATH=src python -m src.drone_rl.train.train_lstm --config configs/baseline_simple_working.yaml
 
 # 3. Check what parameters FlyCraft actually accepts
 PYTHONPATH=src python discover_flycraft_params.py

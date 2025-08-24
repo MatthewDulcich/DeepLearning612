@@ -46,10 +46,10 @@ def print_single_frequency_strategy():
     
     print("\n🎮 USAGE:")
     print("   # Single frequency mode (automatic detection)")
-    print("   PYTHONPATH=src python -m src.drone_rl.train.train --config configs/lstm_predictor_single.yaml")
+    print("   PYTHONPATH=src python -m src.drone_rl.train.train_lstm --config configs/lstm_predictor_single.yaml")
     print()
     print("   # Curriculum mode (when no 'frequency' in config)")  
-    print("   PYTHONPATH=src python -m src.drone_rl.train.train --config configs/lstm_predictor_test.yaml")
+    print("   PYTHONPATH=src python -m src.drone_rl.train.train_lstm --config configs/lstm_predictor_test.yaml")
     
     print("\n✅ BENEFITS:")
     print("   - NO curriculum blocking (0% success won't stop training)")

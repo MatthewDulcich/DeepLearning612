@@ -93,7 +93,7 @@ def validate_predictor_implementation():
     print("   ✅ Test config created")
     print("   ✅ Documentation provided")
     print("\n🚀 Ready for testing with:")
-    print("   PYTHONPATH=src python -m src.drone_rl.train.train --config configs/lstm_predictor_test.yaml")
+    print("   PYTHONPATH=src python -m src.drone_rl.train.train_lstm --config configs/lstm_predictor_test.yaml")
     
     return True
 

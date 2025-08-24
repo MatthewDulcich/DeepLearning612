@@ -160,7 +160,7 @@ def run_diagnosis():
     if env_ok and training_ok:
         print("\n🎉 DIAGNOSIS COMPLETE - Ready for full training!")
         print("   Recommended next steps:")
-        print("   1. Run baseline: python -m src.drone_rl.train.train --config configs/baseline_lstm_improved_fixed.yaml")
+        print("   1. Run baseline: python -m src.drone_rl.train.train_lstm --config configs/baseline_lstm_improved_fixed.yaml")
         print("   2. Run curriculum: python -m src.drone_rl.train.train --config configs/curriculum_transformer_fixed.yaml")
     else:
         print("\n⚠️  ISSUES DETECTED - See errors above")

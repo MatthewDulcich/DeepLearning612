@@ -23,7 +23,7 @@ PYTHONPATH=src python -m src.drone_rl.train.train --config configs/lstm_predicto
 ### Baseline Comparison
 ```bash
 # Train LSTM without predictor for comparison
-PYTHONPATH=src python -m src.drone_rl.train.train --config configs/baseline_lstm.yaml
+PYTHONPATH=src python -m src.drone_rl.train.train_lstm --config configs/baseline_lstm.yaml
 ```implementation adds a non-autoregressive 200-step future predictor to the LSTM policy as an auxiliary task alongside PPO training. The predictor learns to predict the next H future states from the current LSTM features, providing benefits for representation learning and potential model-based planning.
 
 ## Implementation Details

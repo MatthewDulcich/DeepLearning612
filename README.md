@@ -73,7 +73,7 @@ streamlit run demo/app.py -- --checkpoint runs/student/best.pt
 # Train the LSTM baseline (example)
 # Run this from the repo root and ensure PYTHONPATH includes `src`.
 ```bash
-PYTHONPATH=src python -m src.drone_rl.train.train --config configs/baseline_lstm.yaml
+PYTHONPATH=src python -m src.drone_rl.train.train_lstm --config configs/baseline_lstm.yaml
 ```
 ```
 
