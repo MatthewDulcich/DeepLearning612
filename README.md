@@ -53,21 +53,22 @@ drone_transformer_rl/
 # 1. Create environment (CUDA 12.1 build – adjust if your GPU uses 11.x)
 conda env create -f env.yml
 conda activate drone-rl
+cd src
 
-# 2. Generate a dataset (≈ 10 min for 3 k episodes)
-python -m drone_rl.data.generate_dataset --out data/raw --episodes 3000
+# 2. Train teacher policy (Transformer-XL-Large)
+python -m drone_rl.train.train --config ../configs/teacher_large.yaml
 
-# 3. Train teacher policy (Transformer-XL-Large)
-python -m drone_rl.train.train --config configs/teacher_large.yaml
-
-# 4. Distil to student + evaluate
-python -m drone_rl.train.train --config configs/student_distilled.yaml
+# 3. Distil to student + evaluate
+python -m drone_rl.train.train --config ../configs/student_distilled.yaml
 python -m drone_rl.train.evaluate --model runs/student/best.pt
 
-# 5. (Optional) Train Perceiver + ACT sensor-fusion policy
+# 4. (Optional) Train Perceiver + ACT sensor-fusion policy
 python -m drone_rl.train.train --config configs/perceiver_act.yaml
 
-# 5. Launch the Streamlit demo
+# 5. (Optional) Generate a dataset for Offline RL (≈ 10 min for 3 k episodes)
+python -m drone_rl.data.generate_dataset --out data/raw --episodes 3000
+
+# 6. Launch the Streamlit demo
 streamlit run demo/app.py -- --checkpoint runs/student/best.pt
 ```
 
@@ -76,16 +77,22 @@ streamlit run demo/app.py -- --checkpoint runs/student/best.pt
 
 ```bash
 # Login and clone
-ssh <netid>@zaratan.umd.edu
+ssh <netid>@login@zaratan.umd.edu
 git clone <repo-url> drone_transformer_rl
 cd drone_transformer_rl
 
 # Load CUDA module that matches available A100 GPUs
-module load cuda/12.1  gcc/11.3
+module load cuda/12.3.0
 
-# Create Conda env in scratch
-conda env create -f env.yml -p $HOME/conda/envs/drone-rl
-conda activate $HOME/conda/envs/drone-rl
+# Read HPC and Anaconda docs on how to install Miniconda
+
+# create env in $SCRATCH, then conda-pack, and delete conda installation to avoid home and scratch quota limits
+conda env create -f env.yml -p $SCRATCH/conda/envs/drone-rl
+conda activate base
+conda install conda-pack
+conda-pack drone-rl
+conda deactivate
+rm -rf $SCRATCH/condainstall
 
 # Submit a job (single-GPU)
 sbatch slurm/train_teacher_a100.sbatch
