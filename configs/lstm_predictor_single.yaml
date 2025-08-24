@@ -1,0 +1,49 @@
+# LSTM with 5-step future predictor - SINGLE FREQUENCY MODE (no curriculum)
+env_id: FlyCraft-v0
+run_name: lstm_predictor_single_50hz
+output_dir: runs
+seed: 42
+
+# Training at single frequency (50Hz - good balance)
+frequency: 50  # Single frequency to train at
+
+# Moderate scale for proper testing
+n_envs: 4
+max_episode_steps: 500
+
+# LSTM policy
+policy: lstm
+policy_kwargs:
+  lstm_hidden: 128
+  lstm_layers: 2
+  dropout: 0.1
+
+# PPO settings - better for longer training
+ppo_kwargs:
+  n_steps: 512     # More steps per rollout
+  batch_size: 256  # Reasonable batch size
+  n_epochs: 4      # More epochs for better learning
+  learning_rate: 3.0e-4
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+# Longer training to see predictor effects - NO CURRICULUM DIVISION
+timesteps: 250_000  # Full timesteps at single frequency
+
+# Reasonable monitoring
+save_freq: 25_000
+eval_freq: 12_500
+n_eval_episodes: 5
+
+# Enable future predictor with small horizon for testing
+predict_sequence: true
+prediction_horizon: 5
+
+# Single frequency settings (no curriculum progression)
+goal_cfg: {"type": "fixed_short", "distance_m": 150}  # Easier goal
+control_mode: "guidance_law_mode"
+reward_mode: "dense"

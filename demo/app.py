@@ -152,7 +152,7 @@ def load_run(json_path: str) -> RunRecord:
 
 # Cache model loading to avoid reloading on every interaction
 @st.cache_resource
-def load_model(model_path: str, model_type: str = "transformer"):
+def load_model(model_path: str, model_type: str = "transformer", curriculum_params: dict = None):
     """Load a trained model from checkpoint.
     
     Parameters
@@ -161,6 +161,8 @@ def load_model(model_path: str, model_type: str = "transformer"):
         Path to model checkpoint
     model_type : str
         Type of model (transformer, lstm, pid)
+    curriculum_params : dict
+        Curriculum parameters for environment creation
         
     Returns
     -------
@@ -169,9 +171,18 @@ def load_model(model_path: str, model_type: str = "transformer"):
     env
         Environment instance
     """
+    curriculum_params = curriculum_params or {}
+    
     try:
-        # Create environment
-        env = gym.make("FlyCraft", max_episode_steps=1000)
+        # Create environment with curriculum parameters
+        env = gym.make(
+            "FlyCraft", 
+            max_episode_steps=1000,
+            step_frequence=curriculum_params.get("step_frequence", 50),
+            control_mode=curriculum_params.get("control_mode", "guidance_law_mode"),
+            reward_mode=curriculum_params.get("reward_mode", "dense"),
+            goal_cfg=curriculum_params.get("goal_cfg", {"type": "fixed_short", "distance_m": 200})
+        )
         
         # For PID controller, return a custom controller
         if model_type == "pid":
@@ -807,6 +818,26 @@ def main():
         help="Select model architecture"
     )
 
+    # Curriculum Learning settings
+    st.sidebar.subheader("Environment Settings")
+    hz = st.sidebar.selectbox("Hz (step_frequence)", [10, 20, 50, 100], index=2, help="Control frequency")
+    control_mode = st.sidebar.selectbox("Control mode", ["guidance_law_mode", "end_to_end"], index=0, help="Control interface")
+    reward_mode = st.sidebar.selectbox("Reward mode", ["dense", "dense_angle_only", "sparse"], index=0, help="Reward function type")
+    
+    # Goal configuration
+    with st.sidebar.expander("Goal Configuration"):
+        goal_type = st.selectbox("Goal type", ["fixed_short", "bucket_short", "bucket_med", "bucket_wide"], index=0)
+        distance_m = st.number_input("Distance (m)", min_value=100, max_value=1000, value=200, step=50)
+        goal_cfg = {"type": goal_type, "distance_m": distance_m}
+
+    # Bundle curriculum parameters
+    curriculum_params = {
+        "step_frequence": hz,
+        "control_mode": control_mode,
+        "reward_mode": reward_mode,
+        "goal_cfg": goal_cfg
+    }
+
     # Run / Replay mode and auto-retry settings
     mode = st.sidebar.radio("Mode", ["Live", "Replay"], index=0)
     auto_retry = st.sidebar.checkbox("Auto-retry until success", value=True)
@@ -879,7 +910,7 @@ def main():
             elif not low.endswith(".zip"):
                 ckpt_path = ckpt_path + ""
         with st.spinner(f"Loading {model_type.upper()} model..."):
-            model, env = load_model(ckpt_path, model_type)
+            model, env = load_model(ckpt_path, model_type, curriculum_params)
 
         if model is not None and env is not None:
             st.session_state.model = model

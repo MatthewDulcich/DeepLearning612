@@ -272,7 +272,7 @@ class DronePositionController:
 
 class LSTMFeatureExtractor(BaseFeaturesExtractor):
     """LSTM-based feature extractor for sequential observations."""
-    
+
     def __init__(
         self,
         observation_space: spaces.Dict,
@@ -280,92 +280,28 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
         lstm_hidden: int = 256,
         num_layers: int = 2,
         dropout: float = 0.1,
-        **kwargs  # Accept any additional kwargs for compatibility
+        n_envs: int = 1
     ):
-        """Initialize LSTM feature extractor.
-        
-        Parameters
-        ----------
-        observation_space : spaces.Dict
-            Observation space (expects dictionary of arrays)
-        features_dim : int
-            Output feature dimension
-        lstm_hidden : int
-            Hidden size of LSTM layers
-        num_layers : int
-            Number of LSTM layers
-        dropout : float
-            Dropout probability between LSTM layers
-        **kwargs
-            Additional keyword arguments (ignored for compatibility)
-        """
-        super().__init__(observation_space, features_dim=features_dim)
-        
-        # Log any unexpected kwargs for debugging
-        if kwargs:
-            print(f"LSTMFeatureExtractor: Ignoring unexpected kwargs: {list(kwargs.keys())}")
-        
-        # Determine input size from observation space
-        self.input_size = 0
-        for space in observation_space.values():
-            if isinstance(space, spaces.Box):
-                self.input_size += int(np.prod(space.shape))
-            else:
-                raise ValueError(f"Unsupported observation space: {space}")
-        
-        # Store LSTM parameters
+        super().__init__(observation_space, features_dim)
+        # Flatten all obs into a single vector
+        input_dim = sum([np.prod(space.shape) for space in observation_space.spaces.values()])
         self.lstm_hidden = lstm_hidden
         self.num_layers = num_layers
-        
-        # LSTM layers
+        self.n_envs = n_envs
+
         self.lstm = nn.LSTM(
-            input_size=self.input_size,
-            hidden_size=lstm_hidden,
+            input_dim,
+            lstm_hidden,
             num_layers=num_layers,
             batch_first=True,
-            dropout=dropout if num_layers > 1 else 0
+            dropout=dropout if num_layers > 1 else 0.0,
         )
-        
-        # Output projection
-        self.linear = nn.Sequential(
-            nn.Linear(lstm_hidden, features_dim),
-            nn.ReLU()
-        )
-        
-        # Hidden state for recurrent processing
-        self._hidden_state = None
-    
-    def forward(self, observations: Dict[str, torch.Tensor]) -> torch.Tensor:
-        """Process observations through LSTM.
-        
-        Parameters
-        ----------
-        observations : Dict[str, torch.Tensor]
-            Dictionary of observation tensors
-            
-        Returns
-        -------
-        torch.Tensor
-            Extracted features
-        """
-        # Flatten dict obs to a single vector per sample
-        x = torch.cat([v.float().view(v.shape[0], -1) for v in observations.values()], dim=1)
-        # Add sequence dimension if missing (SB3 usually provides [batch, features])
-        if x.dim() == 2:
-            x = x.unsqueeze(1)  # [batch, seq=1, features]
-        batch_size = x.size(0)
-        device = x.device
+        self.linear = nn.Linear(lstm_hidden, features_dim)
 
-        # Use or expand hidden state buffer
-        if self._hidden_state is None or self._hidden_state[0].shape[1] != batch_size:
-            self.reset_hidden(n_envs=batch_size)
-        h, c = self._hidden_state
-        lstm_out, (h_new, c_new) = self.lstm(x, (h, c))  # lstm_out: [batch, seq, lstm_hidden]
-        self._hidden_state = (h_new.detach(), c_new.detach())
-        # Take the last output in the sequence
-        features = lstm_out[:, -1, :]
-        return self.linear(features)
-    
+        # Hidden state buffer for each env
+        self._hidden_state = None
+        self.reset_hidden(n_envs)
+
     def reset_hidden(self, n_envs: int = None, done_mask=None, device=None):
         """Reset LSTM hidden states.
         
@@ -405,6 +341,26 @@ class LSTMFeatureExtractor(BaseFeaturesExtractor):
                 print("Reset hidden: No hidden state to reset, skipping")
 
 
+    def forward(self, observations: dict) -> torch.Tensor:
+        # Flatten dict obs to a single vector per sample
+        x = torch.cat([v.float().view(v.shape[0], -1) for v in observations.values()], dim=1)
+        # Add sequence dimension if missing (SB3 usually provides [batch, features])
+        if x.dim() == 2:
+            x = x.unsqueeze(1)  # [batch, seq=1, features]
+        batch_size = x.size(0)
+        device = x.device
+
+        # Use or expand hidden state buffer
+        if self._hidden_state is None or self._hidden_state[0].shape[1] != batch_size:
+            self.reset_hidden(batch_size)
+        h, c = self._hidden_state
+        lstm_out, (h_new, c_new) = self.lstm(x, (h, c))  # lstm_out: [batch, seq, lstm_hidden]
+        self._hidden_state = (h_new.detach(), c_new.detach())
+        # Take the last output in the sequence
+        features = lstm_out[:, -1, :]
+        return self.linear(features)
+
+
 class SimpleLSTMPolicy(ActorCriticPolicy):
     """LSTM-based policy for sequential decision making.
     
@@ -418,6 +374,7 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         lstm_hidden: int = 256,
         lstm_layers: int = 2,
         dropout: float = 0.1,
+        n_envs: int = 1,
         **kwargs: Any
     ):
         """Initialize LSTM policy.
@@ -432,6 +389,8 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
             Number of LSTM layers
         dropout : float
             Dropout probability
+        n_envs : int
+            Number of parallel environments
         **kwargs : Any
             Keyword arguments for parent class
         """
@@ -440,7 +399,8 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
             "features_dim": 128,
             "lstm_hidden": lstm_hidden,
             "num_layers": lstm_layers,
-            "dropout": dropout
+            "dropout": dropout,
+            "n_envs": n_envs
         }
         kwargs.setdefault("features_extractor_class", LSTMFeatureExtractor)
         kwargs.setdefault("features_extractor_kwargs", features_kwargs)
@@ -464,6 +424,21 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         
         # Initialize weights
         self.apply(self._weights_init)
+        
+        # Manually initialize action distribution (replicate _build behavior without overwriting networks)
+        from stable_baselines3.common.distributions import make_proba_distribution
+        self.action_dist = make_proba_distribution(self.action_space)
+        
+        # Set up distribution parameters like _build() does
+        if hasattr(self.action_dist, "use_sde"):
+            self.action_dist.use_sde = False
+        if hasattr(self.action_dist, "log_std_init"):
+            self.action_dist.log_std_init = getattr(self, "log_std_init", 0.0)
+        
+        # Future predictor attributes (set by training code)
+        self.predict_horizon = None
+        self.state_dim = None
+        self.predictor_head = None
     
     @staticmethod
     def _weights_init(module: nn.Module) -> None:
@@ -492,7 +467,7 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            Actions, values, and action parameters
+            Actions, values, and log probabilities
         """
         features = self.extract_features(obs)
         
@@ -511,10 +486,16 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         # Sample actions
         actions = dist.get_actions(deterministic=deterministic)
         
-        # Compute values
-        values = self.value_net(features).flatten()
+        # Get log probabilities for the sampled actions
+        log_prob = dist.log_prob(actions)
+        # For continuous actions: ensure log_prob is summed to shape (n_envs,)
+        if isinstance(self.action_space, spaces.Box) and log_prob.ndim > 1:
+            log_prob = log_prob.sum(dim=-1)
         
-        return actions, values, action_params
+        # Compute values
+        values = self.value_net(features).squeeze(-1)
+        
+        return actions, values, log_prob
     
     def _predict(self, observation: Dict[str, torch.Tensor], deterministic: bool = False) -> torch.Tensor:
         """Predict action given observation.
@@ -551,10 +532,7 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
         """
         features = self.extract_features(obs)
         
-        # Compute values
-        values = self.value_net(features).flatten()
-        
-        # Get action distribution
+        # Handle both discrete and continuous actions
         if isinstance(self.action_space, spaces.Discrete):
             logits = self.action_net(features)
             dist = self.action_dist.proba_distribution(action_logits=logits)
@@ -563,13 +541,83 @@ class SimpleLSTMPolicy(ActorCriticPolicy):
             log_std = self.action_log_std.expand_as(mean_actions)
             dist = self.action_dist.proba_distribution(mean_actions, log_std)
         
-        # Compute log probabilities and entropy
         log_prob = dist.log_prob(actions)
+        # For continuous actions: ensure log_prob is summed to shape (n_envs,)
+        # For discrete actions: log_prob should already be shape (n_envs,)
+        if isinstance(self.action_space, spaces.Box) and log_prob.ndim > 1:
+            log_prob = log_prob.sum(dim=-1)
         entropy = dist.entropy()
-        
+        if isinstance(self.action_space, spaces.Box) and entropy.ndim > 1:
+            entropy = entropy.sum(dim=-1)
+        values = self.value_net(features).squeeze(-1)
         return values, log_prob, entropy
     
-    def reset_hidden(self) -> None:
-        """Reset LSTM hidden state between episodes."""
+    def predict_values(self, obs: Dict[str, torch.Tensor]) -> torch.Tensor:
+        """Predict values using our custom LSTM feature extractor.
+        
+        Parameters
+        ----------
+        obs : Dict[str, torch.Tensor]
+            Observation dictionary
+            
+        Returns
+        -------
+        torch.Tensor
+            Predicted values
+        """
+        features = self.extract_features(obs)
+        return self.value_net(features).squeeze(-1)
+    
+    def reset_hidden(self, n_envs: int = None, done_mask: np.ndarray = None) -> None:
+        """Reset LSTM hidden state between episodes or for done envs."""
         if hasattr(self.features_extractor, "reset_hidden"):
-            self.features_extractor.reset_hidden()
+            self.features_extractor.reset_hidden(n_envs=n_envs, done_mask=done_mask)
+    
+    def create_predictor_head(self, horizon: int, state_dim: int, device: Optional[torch.device] = None):
+        """Configure and create a non-autoregressive predictor head mapping pooled features -> H x state_dim.
+        
+        Parameters
+        ----------
+        horizon : int
+            Number of future steps to predict
+        state_dim : int
+            Dimensionality of flattened state
+        device : Optional[torch.device]
+            Device to place the predictor head on
+        """
+        device = device or next(self.parameters()).device
+        self.predict_horizon = int(horizon)
+        self.state_dim = int(state_dim)
+        
+        # Get features dimension from the extractor or policy
+        feat_dim = getattr(self.features_extractor, "features_dim", None) or getattr(self, "features_dim", None)
+        if feat_dim is None:
+            raise RuntimeError("Cannot find features_dim on policy/extractor")
+        
+        self.predictor_head = nn.Linear(int(feat_dim), int(self.predict_horizon * self.state_dim)).to(device)
+        print(f"Created predictor head: {feat_dim} -> {self.predict_horizon * self.state_dim} (H={self.predict_horizon}, D={self.state_dim})")
+
+    def predict_future(self, features: torch.Tensor) -> torch.Tensor:
+        """Predict non-autoregressive next-H states from pooled LSTM features.
+        
+        Parameters
+        ----------
+        features : torch.Tensor
+            Pooled features from LSTM extractor, shape [B, features_dim]
+            
+        Returns
+        -------
+        torch.Tensor
+            Predicted future states, shape [B, H, state_dim]
+        """
+        if self.predictor_head is None:
+            raise RuntimeError("predictor_head not configured on policy (call create_predictor_head first)")
+        if self.predict_horizon is None or self.state_dim is None:
+            raise RuntimeError("predict_horizon/state_dim not set on policy")
+        
+        out = self.predictor_head(features)  # [B, H*D]
+        B = out.shape[0]
+        H = int(self.predict_horizon)
+        D = int(self.state_dim)
+        return out.view(B, H, D)
+

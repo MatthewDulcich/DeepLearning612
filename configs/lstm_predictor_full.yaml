@@ -1,0 +1,60 @@
+# Full-scale LSTM with 200-step future predictor
+env_id: FlyCraft-v0
+run_name: lstm_predictor_200step
+output_dir: runs
+seed: 42
+
+# Production scale
+n_envs: 8
+max_episode_steps: 1000
+
+# LSTM policy with larger capacity
+policy: lstm
+policy_kwargs:
+  lstm_hidden: 256    # Larger for 200-step prediction task
+  lstm_layers: 2
+  dropout: 0.1
+
+# PPO settings optimized for longer training
+ppo_kwargs:
+  n_steps: 1024       # Good balance of sample efficiency vs memory
+  batch_size: 512     # Reasonable batch size for stable learning
+  n_epochs: 4
+  learning_rate: 3.0e-4
+  gamma: 0.997        # Slightly higher for longer episodes
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+# Long training to see full effects of 200-step prediction
+timesteps: 2_000_000
+
+# Regular monitoring
+save_freq: 100_000
+eval_freq: 50_000
+n_eval_episodes: 10
+
+# Enable 200-step future predictor
+predict_sequence: true
+prediction_horizon: 200
+
+# Curriculum settings for progression through frequencies
+goal_cfg_by_freq:
+  "10": {"type": "fixed_short", "distance_m": 150}    # Easier start
+  "20": {"type": "fixed_short", "distance_m": 250}    # Gradual increase
+  "50": {"type": "fixed_medium", "distance_m": 400}   # More challenging
+  "100": {"type": "fixed_long", "distance_m": 600}    # Advanced
+
+control_mode_by_freq:
+  "10": "guidance_law_mode"
+  "20": "guidance_law_mode"
+  "50": "guidance_law_mode" 
+  "100": "guidance_law_mode"
+
+reward_mode_by_freq:
+  "10": "dense"
+  "20": "dense"
+  "50": "dense"
+  "100": "dense"

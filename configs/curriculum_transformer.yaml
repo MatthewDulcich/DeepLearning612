@@ -1,0 +1,59 @@
+env_id: FlyCraft-v0
+eval_freq: 5000
+n_envs: 8
+output_dir: runs
+policy: transformer
+policy_kwargs:
+  embed_dim: 256
+  num_heads: 8
+  num_layers: 4
+  dropout: 0.1
+ppo_kwargs:
+  batch_size: 512
+  clip_range: 0.2
+  gae_lambda: 0.95
+  gamma: 0.99
+  learning_rate: 0.0001
+  n_epochs: 5
+  n_steps: 512
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+run_name: curriculum_transformer
+save_freq: 10000
+seed: 42
+timesteps: 50000
+n_eval_episodes: 10
+
+# Curriculum Learning Configuration
+# Control mode by frequency
+control_mode_by_freq:
+  "10": guidance_law_mode
+  "20": guidance_law_mode
+  "50": guidance_law_mode
+  "100": guidance_law_mode
+
+# Reward mode by frequency  
+reward_mode_by_freq:
+  "10": dense
+  "20": dense
+  "50": dense_angle_only
+  "100": dense_angle_only
+
+# Goal configuration by frequency
+goal_cfg_by_freq:
+  "10":
+    type: fixed_short
+    distance_m: 200
+    heading_jitter_deg: 5
+  "20":
+    type: bucket_short
+    distance_bins: [150, 250, 350]
+  "50":
+    type: bucket_med
+    distance_bins: [250, 400, 600]
+    yaw_bins: [-30, 30]
+  "100":
+    type: bucket_wide
+    distance_bins: [300, 700, 1000]
+    yaw_bins: [-60, 60]

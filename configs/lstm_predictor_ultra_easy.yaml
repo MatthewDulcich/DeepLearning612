@@ -1,0 +1,35 @@
+# Ultra-easy LSTM with predictor configuration for guaranteed positive results
+model:
+  policy_type: "LSTM"
+  predictor:
+    enabled: true
+    horizon: 200
+    learning_rate: 0.001
+    
+training:
+  total_timesteps: 1000000
+  batch_size: 512
+  learning_rate: 0.0003
+  frequency: 10  # Single frequency mode - no curriculum
+  
+environment:
+  env_name: "FlyCraft-v0"
+  num_envs: 4
+  target_distance: 50.0  # Very close targets (default is 200m)
+  max_episode_steps: 200  # Very short episodes
+  
+curriculum:
+  enabled: false  # Disabled for single frequency
+  reward_mode: "dense"  # Use enhanced dense rewards
+  frequencies: [10]
+  success_thresholds: [0.7]
+  min_episodes_per_stage: 100
+  
+logging:
+  log_interval: 10
+  save_interval: 50000
+  checkpoint_dir: "runs/lstm_predictor_ultra_easy"
+  wandb:
+    enabled: true
+    project: "drone-rl-ultra-easy"
+    entity: null
