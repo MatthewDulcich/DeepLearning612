@@ -167,11 +167,37 @@ class SequencePredictionCallback(BaseCallback):
                 obs = next_obs
                 steps += 1
 
+            # DEBUG: Print observations[0] and steps before calling predict_next_states
+            # print("DEBUG: observations[0] type:", type(observations[0]))
+            # if isinstance(observations[0], dict):
+            #     for k, v in observations[0].items():
+            #         print(f"DEBUG: observations[0][{k}] type: {type(v)}, shape: {np.shape(v)}")
+            # else:
+            #     print("DEBUG: observations[0] shape:", np.shape(observations[0]))
+            # print("DEBUG: steps:", steps)
             try:
                 preds = self.model.policy.predict_next_states(observations[0], steps)
             except Exception as e:
                 self.logger.record("eval/seq_prediction_error", str(e))
                 continue
+
+            # DEBUG: Print type and shape info
+            # print("DEBUG: preds type:", type(preds))
+            # if isinstance(preds, np.ndarray):
+            #     print("DEBUG: preds shape:", preds.shape)
+            # elif isinstance(preds, (list, tuple)):
+            #     print("DEBUG: preds length:", len(preds))
+            #     if len(preds) > 0:
+            #         print("DEBUG: preds[0] type:", type(preds[0]))
+            #         if hasattr(preds[0], "shape"):
+            #             print("DEBUG: preds[0] shape:", preds[0].shape)
+            #         else:
+            #             print("DEBUG: preds[0]:", preds[0])
+            # else:
+            #     print("DEBUG: preds:", preds)
+
+            # # Optionally, print a small sample of the data
+            # print("DEBUG: preds sample:", preds if isinstance(preds, (int, float)) else str(preds)[:300])
 
             preds = np.asarray(preds).reshape(steps, -1)
             L = min(len(true_states), preds.shape[0])
@@ -395,9 +421,10 @@ def main() -> None:
         if hasattr(model.policy, "create_predictor_head"):
             try:
                 model.policy.create_predictor_head(horizon=horizon, state_dim=state_dim, hidden_dim=hidden_dim, num_layers=decoder_layers)
-                # predictor object available as model.policy.predictor per API
-                model.policy.state_predictor = getattr(model.policy, "predictor", None)
-            except Exception:
+                model.policy.state_predictor = getattr(model.policy, "state_predictor", None)
+                print("DEBUG: state_predictor after create_predictor_head:", model.policy.state_predictor)
+            except Exception as e:
+                print("DEBUG: create_predictor_head failed with exception:", e)
                 model.policy.state_predictor = None
         else:
             # Fallback: attach a standalone predictor module
@@ -409,6 +436,7 @@ def main() -> None:
                 num_layers=decoder_layers,
             ).to(model.policy.device)
             model.policy.state_predictor = seq_predictor
+            print("DEBUG: state_predictor set to fallback:", model.policy.state_predictor)
 
         def _flatten_first_env_t(obs_t):
             if isinstance(obs_t, dict):
@@ -417,15 +445,47 @@ def main() -> None:
 
         @torch.no_grad()
         def predict_next_states(obs0, horizon_local=None):
+            # print("DEBUG: predict_next_states called")
+            # print("DEBUG: obs0 type:", type(obs0))
+            # if isinstance(obs0, dict):
+            #     for k, v in obs0.items():
+            #         print(f"DEBUG: obs0[{k}] type: {type(v)}, shape: {np.shape(v)}")
+            # else:
+            #     print("DEBUG: obs0 shape:", np.shape(obs0))
+            # print("DEBUG: horizon_local:", horizon_local)
             if horizon_local is None:
                 horizon_local = horizon
             obs_t, _ = model.policy.obs_to_tensor(obs0)
+            # print("DEBUG: obs_t type:", type(obs_t))
+            # if isinstance(obs_t, dict):
+            #     for k, v in obs_t.items():
+            #         print(f"DEBUG: obs_t[{k}] type: {type(v)}, shape: {v.shape if hasattr(v, 'shape') else 'N/A'}")
+            # else:
+            #     print("DEBUG: obs_t shape:", obs_t.shape if hasattr(obs_t, 'shape') else 'N/A')
             emb = model.policy.extract_features(obs_t)
+            # print("DEBUG: emb type:", type(emb))
+            # if hasattr(emb, 'shape'):
+            #     print("DEBUG: emb shape:", emb.shape)
+            # else:
+            #     print("DEBUG: emb: ", emb)
             init_state = _flatten_first_env_t(obs_t)
+            # print("DEBUG: init_state type:", type(init_state))
+            # if hasattr(init_state, 'shape'):
+            #     print("DEBUG: init_state shape:", init_state.shape)
+            # else:
+            #     print("DEBUG: init_state: ", init_state)
             if getattr(model.policy, "state_predictor", None) is None:
+                # print("DEBUG: state_predictor is None!")
                 return None
             preds = model.policy.state_predictor(embedding=emb[0].unsqueeze(0), initial_state=init_state.unsqueeze(0))
-            return preds.cpu().numpy()[0][:horizon_local]
+            # print("DEBUG: preds (raw) type:", type(preds))
+            # if hasattr(preds, 'shape'):
+            #     print("DEBUG: preds (raw) shape:", preds.shape)
+            # else:
+            #     print("DEBUG: preds (raw):", preds)
+            result = preds.cpu().numpy()[0][:horizon_local]
+            # print("DEBUG: preds (final) shape:", result.shape)
+            return result
 
         def get_seq_prediction_targets(batch_size=40):
             """Return (embedding, target_sequence) sampled from the rollout buffer.
