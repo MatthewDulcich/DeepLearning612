@@ -31,6 +31,14 @@ python generate_acmi.py \
 
 This will create a file like `demo/acmi_logs/rollout_lstm.acmi`.
 
+## Running the Streamlit Demo
+
+From the repository root run:
+
+```bash
+PYTHONPATH=src streamlit run demo/app.py
+```
+
 ## Visualizing in Tacview
 
 1. Download and install [Tacview](https://tacview.net/).
